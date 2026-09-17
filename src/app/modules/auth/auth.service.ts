@@ -3,6 +3,7 @@ import jwt, { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import config from "../../../config";
 import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
+import { sendEmail } from "../../utils/sendEmail";
 import {
   IAppleLogin,
   IChangePassword,
@@ -10,17 +11,27 @@ import {
   IGoogleLogin,
   ILoginUser,
   IRegisterUser,
+  IResendOtp,
   IResetPassword,
+  IVerifyOtp,
 } from "./auth.interface";
+import {
+  emailVerificationTemplate,
+  passwordResetTemplate,
+} from "../../utils/templates";
 
-// Utility: Sanitize user object to never leak sensitive fields like password
+// Utility: Sanitize user object to never leak sensitive fields
 const sanitizeUser = (user: any) => {
   const { password, ...sanitized } = user;
   return sanitized;
 };
 
 // Utility: Generate JWT Access Token
-const generateAccessToken = (user: { id: string; email: string; role: string }) => {
+const generateAccessToken = (user: {
+  id: string;
+  email: string;
+  role: string;
+}) => {
   const jwtPayload = {
     id: user.id,
     email: user.email,
@@ -33,50 +44,196 @@ const generateAccessToken = (user: { id: string; email: string; role: string }) 
 };
 
 /**
- * 1. Register User (Email & Password)
+ * 1. Register User (Step 1: Save User & Send OTP)
  */
 const registerUser = async (payload: IRegisterUser) => {
   const normalizedEmail = payload.email.toLowerCase().trim();
 
-  // Check if an account already exists with this email
+  // Check if account already exists
   const existingUser = await prisma.user.findUnique({
     where: { email: normalizedEmail },
   });
 
-  if (existingUser) {
+  if (existingUser && existingUser.isVerified) {
     throw new AppError(
       "An account with this email address already exists. Please log in instead.",
-      400
+      400,
     );
   }
 
   // Hash password securely
   const hashedPassword = await bcrypt.hash(
     payload.password,
-    Number(config.password_salt)
+    Number(config.password_salt),
   );
 
-  const newUser = await prisma.user.create({
+  let user = existingUser;
+  if (!user) {
+    // Create new unverified user
+    user = await prisma.user.create({
+      data: {
+        name: payload.name.trim(),
+        email: normalizedEmail,
+        password: hashedPassword,
+        authProvider: "email",
+        status: "active",
+        isVerified: false,
+      },
+    });
+  } else {
+    // If existing user was not verified, update details
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        name: payload.name.trim(),
+        password: hashedPassword,
+      },
+    });
+  }
+
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+  // Invalidate any previous registration OTPs
+  await prisma.otp.deleteMany({
+    where: { email: normalizedEmail, type: "REGISTRATION" },
+  });
+
+  // Save new OTP
+  await prisma.otp.create({
     data: {
-      name: payload.name.trim(),
       email: normalizedEmail,
-      password: hashedPassword,
-      authProvider: "email",
-      status: "active",
-      isVerified: false,
+      otp,
+      type: "REGISTRATION",
+      expiresAt,
     },
   });
 
-  const accessToken = generateAccessToken(newUser);
+  // Send verification email
+  const template = emailVerificationTemplate({ name: user.name, otp });
+  await sendEmail({
+    to: normalizedEmail,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+  });
 
   return {
-    accessToken,
-    user: sanitizeUser(newUser),
+    message:
+      "Registration initiated successfully. A verification code (OTP) has been sent to your email.",
+    email: normalizedEmail,
+    otp: config.NODE_ENV === "development" ? otp : undefined,
   };
 };
 
 /**
- * 2. Login User (Email & Password)
+ * 2. Verify Registration OTP (Step 2: Activate & Issue Access Token)
+ */
+const verifyRegistrationOtp = async (payload: IVerifyOtp) => {
+  const normalizedEmail = payload.email.toLowerCase().trim();
+  const inputOtp = payload.otp.trim();
+
+  // Find OTP record
+  const otpRecord = await prisma.otp.findFirst({
+    where: {
+      email: normalizedEmail,
+      otp: inputOtp,
+      type: "REGISTRATION",
+    },
+  });
+
+  if (!otpRecord) {
+    throw new AppError(
+      "Invalid verification code. Please check your email or request a new code.",
+      400,
+    );
+  }
+
+  // Check expiration
+  if (otpRecord.expiresAt < new Date()) {
+    await prisma.otp.delete({ where: { id: otpRecord.id } });
+    throw new AppError(
+      "Verification code has expired. Please request a new code.",
+      400,
+    );
+  }
+
+  // Delete used OTP
+  await prisma.otp.delete({ where: { id: otpRecord.id } });
+
+  // Update user as verified
+  const user = await prisma.user.update({
+    where: { email: normalizedEmail },
+    data: {
+      isVerified: true,
+      status: "active",
+    },
+  });
+
+  const accessToken = generateAccessToken(user);
+
+  return {
+    accessToken,
+    user: sanitizeUser(user),
+    message: "Account verified successfully! Welcome to Diamond Pay.",
+  };
+};
+
+/**
+ * 3. Resend OTP (Registration or Forgot Password)
+ */
+const resendOtp = async (payload: IResendOtp) => {
+  const normalizedEmail = payload.email.toLowerCase().trim();
+  const type = payload.type || "REGISTRATION";
+
+  const user = await prisma.user.findUnique({
+    where: { email: normalizedEmail },
+  });
+
+  if (!user) {
+    throw new AppError("No account found with this email address.", 404);
+  }
+
+  // Generate new OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  // Invalidate previous OTPs
+  await prisma.otp.deleteMany({
+    where: { email: normalizedEmail, type },
+  });
+
+  await prisma.otp.create({
+    data: {
+      email: normalizedEmail,
+      otp,
+      type,
+      expiresAt,
+    },
+  });
+
+  const isRegistration = type === "REGISTRATION";
+  const template = isRegistration
+    ? emailVerificationTemplate({ name: user.name, otp })
+    : passwordResetTemplate({ name: user.name, otp });
+
+  await sendEmail({
+    to: normalizedEmail,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+  });
+
+  return {
+    message: "A new verification code has been sent to your email address.",
+    email: normalizedEmail,
+    otp: config.NODE_ENV === "development" ? otp : undefined,
+  };
+};
+
+/**
+ * 4. Login User (Email & Password)
  */
 const loginUser = async (payload: ILoginUser) => {
   const normalizedEmail = payload.email.toLowerCase().trim();
@@ -88,22 +245,30 @@ const loginUser = async (payload: ILoginUser) => {
   if (!user) {
     throw new AppError(
       "No account found with this email address. Please check your email or sign up.",
-      404
+      404,
     );
   }
 
-  // Account status verification
+  // Account status check
   if (user.status === "blocked") {
     throw new AppError(
       "Your account has been suspended. Please contact customer support.",
-      403
+      403,
     );
   }
 
   if (user.status === "inactive") {
     throw new AppError(
       "Your account is currently inactive. Please contact customer support.",
-      403
+      403,
+    );
+  }
+
+  // If user has not verified their email yet
+  if (!user.isVerified) {
+    throw new AppError(
+      "Your email is not verified yet. Please enter the OTP sent to your email or click resend.",
+      403,
     );
   }
 
@@ -113,24 +278,24 @@ const loginUser = async (payload: ILoginUser) => {
       user.authProvider === "google"
         ? "Google"
         : user.authProvider === "apple"
-        ? "Apple"
-        : "social";
+          ? "Apple"
+          : "social";
     throw new AppError(
       `This account is registered with ${providerName} sign-in. Please use "Continue with ${providerName}" to log in.`,
-      400
+      400,
     );
   }
 
   // Validate password
   const isPasswordMatched = await bcrypt.compare(
     payload.password,
-    user.password
+    user.password,
   );
 
   if (!isPasswordMatched) {
     throw new AppError(
       "Incorrect password. Please verify your password or use 'Forgot Password'.",
-      401
+      401,
     );
   }
 
@@ -143,7 +308,7 @@ const loginUser = async (payload: ILoginUser) => {
 };
 
 /**
- * 3. Google Sign-In / Login
+ * 5. Google Sign-In / Login
  */
 const googleLogin = async (payload: IGoogleLogin) => {
   let email = payload.email?.toLowerCase().trim();
@@ -151,11 +316,10 @@ const googleLogin = async (payload: IGoogleLogin) => {
   let googleId = payload.googleId;
   let avatar = payload.avatar;
 
-  // If client provided a Google ID token, verify it via Google's tokeninfo API
   if (payload.idToken) {
     try {
       const response = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${payload.idToken}`
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${payload.idToken}`,
       );
       if (response.ok) {
         const tokenInfo: any = await response.json();
@@ -166,16 +330,15 @@ const googleLogin = async (payload: IGoogleLogin) => {
       } else if (!email || !googleId) {
         throw new AppError(
           "Invalid or expired Google authentication token.",
-          401
+          401,
         );
       }
     } catch (err: any) {
       if (err instanceof AppError) throw err;
-      // If network fails to reach Google but client sent verified profile data, fallback gracefully
       if (!email || !googleId) {
         throw new AppError(
           "Unable to verify Google credentials. Please try again.",
-          401
+          401,
         );
       }
     }
@@ -184,11 +347,10 @@ const googleLogin = async (payload: IGoogleLogin) => {
   if (!email && !googleId) {
     throw new AppError(
       "Google login requires a valid Google ID or email address.",
-      400
+      400,
     );
   }
 
-  // Find user by Google ID or Email
   let user = null;
   if (googleId) {
     user = await prisma.user.findFirst({ where: { googleId } });
@@ -198,21 +360,19 @@ const googleLogin = async (payload: IGoogleLogin) => {
   }
 
   if (user) {
-    // Check status
     if (user.status === "blocked") {
       throw new AppError(
         "Your account has been suspended. Please contact customer support.",
-        403
+        403,
       );
     }
     if (user.status === "inactive") {
       throw new AppError(
         "Your account is currently inactive. Please contact customer support.",
-        403
+        403,
       );
     }
 
-    // Link Google ID or avatar if not yet linked
     if (!user.googleId || !user.avatar) {
       user = await prisma.user.update({
         where: { id: user.id },
@@ -224,7 +384,6 @@ const googleLogin = async (payload: IGoogleLogin) => {
       });
     }
   } else {
-    // Auto-create new user via Google
     user = await prisma.user.create({
       data: {
         name: name || "Google User",
@@ -248,24 +407,21 @@ const googleLogin = async (payload: IGoogleLogin) => {
 };
 
 /**
- * 4. Apple Sign-In / Login
+ * 6. Apple Sign-In / Login
  */
 const appleLogin = async (payload: IAppleLogin) => {
   const { appleId, identityToken } = payload;
   let email = payload.email?.toLowerCase().trim();
   let name = payload.name?.trim();
 
-  // If identity token provided, decode payload to extract sub & email if missing
   if (identityToken) {
     try {
       const decoded = jwt.decode(identityToken) as any;
-      if (decoded) {
-        if (!email && decoded.email) {
-          email = decoded.email.toLowerCase().trim();
-        }
+      if (decoded && !email && decoded.email) {
+        email = decoded.email.toLowerCase().trim();
       }
     } catch {
-      // Ignore decode error and proceed with appleId
+      // Proceed with appleId
     }
   }
 
@@ -273,9 +429,7 @@ const appleLogin = async (payload: IAppleLogin) => {
     throw new AppError("Apple ID / Subject identifier is required.", 400);
   }
 
-  // Find user by appleId or email
   let user = await prisma.user.findFirst({ where: { appleId } });
-
 
   if (!user && email) {
     user = await prisma.user.findUnique({ where: { email } });
@@ -285,17 +439,16 @@ const appleLogin = async (payload: IAppleLogin) => {
     if (user.status === "blocked") {
       throw new AppError(
         "Your account has been suspended. Please contact customer support.",
-        403
+        403,
       );
     }
     if (user.status === "inactive") {
       throw new AppError(
         "Your account is currently inactive. Please contact customer support.",
-        403
+        403,
       );
     }
 
-    // Link Apple ID or update name if missing
     if (!user.appleId || (name && user.name === "Apple User")) {
       user = await prisma.user.update({
         where: { id: user.id },
@@ -307,7 +460,6 @@ const appleLogin = async (payload: IAppleLogin) => {
       });
     }
   } else {
-    // Generate fallback email if user chose to hide email and Apple provided no relay email
     const fallbackEmail = email || `${appleId}@privaterelay.apple.com`;
 
     user = await prisma.user.create({
@@ -332,7 +484,7 @@ const appleLogin = async (payload: IAppleLogin) => {
 };
 
 /**
- * 5. Forgot Password
+ * 7. Forgot Password (Step 1: Generate & Send OTP)
  */
 const forgotPassword = async (payload: IForgotPassword) => {
   const normalizedEmail = payload.email.toLowerCase().trim();
@@ -344,43 +496,171 @@ const forgotPassword = async (payload: IForgotPassword) => {
   if (!user) {
     throw new AppError(
       "No account found with this email address. Please check your email and try again.",
-      404
+      404,
     );
   }
 
   if (user.status === "blocked" || user.status === "inactive") {
     throw new AppError(
       `Your account is currently ${user.status}. Please contact support.`,
-      403
+      403,
     );
   }
 
+  if (!user.password) {
+    const provider = user.authProvider === "google" ? "Google" : "Apple";
+    throw new AppError(
+      `This account is registered with ${provider} sign-in. Password reset is not available.`,
+      400,
+    );
+  }
+
+  // Generate 6-digit OTP
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  // Invalidate any old forgot-password OTPs
+  await prisma.otp.deleteMany({
+    where: { email: normalizedEmail, type: "FORGOT_PASSWORD" },
+  });
+
+  await prisma.otp.create({
+    data: {
+      email: normalizedEmail,
+      otp,
+      type: "FORGOT_PASSWORD",
+      expiresAt,
+    },
+  });
+
+  // Send Email
+  const template = passwordResetTemplate({ name: user.name, otp });
+  await sendEmail({
+    to: normalizedEmail,
+    subject: template.subject,
+    html: template.html,
+    text: template.text,
+  });
+
   return {
-    message:
-      "If an account exists with this email, password reset instructions have been sent.",
+    message: "A password reset code (OTP) has been sent to your email address.",
+    email: normalizedEmail,
+    otp: config.NODE_ENV === "development" ? otp : undefined,
   };
 };
 
 /**
- * 6. Reset Password
+ * 8. Verify Forgot Password OTP (Step 2: Exchange for Reset Token)
+ */
+const verifyForgotOtp = async (payload: IVerifyOtp) => {
+  const normalizedEmail = payload.email.toLowerCase().trim();
+  const inputOtp = payload.otp.trim();
+
+  const otpRecord = await prisma.otp.findFirst({
+    where: {
+      email: normalizedEmail,
+      otp: inputOtp,
+      type: "FORGOT_PASSWORD",
+    },
+  });
+
+  if (!otpRecord) {
+    throw new AppError(
+      "Invalid reset code. Please check your email or request a new code.",
+      400,
+    );
+  }
+
+  if (otpRecord.expiresAt < new Date()) {
+    await prisma.otp.delete({ where: { id: otpRecord.id } });
+    throw new AppError(
+      "Reset code has expired. Please request a new code.",
+      400,
+    );
+  }
+
+  // Invalidate verified OTP
+  await prisma.otp.delete({ where: { id: otpRecord.id } });
+
+  // Generate short-lived reset token (valid for 15 minutes)
+  const resetToken = jwt.sign(
+    { email: normalizedEmail, purpose: "reset-password" },
+    config.jwt.secret as Secret,
+    { expiresIn: "15m" },
+  );
+
+  return {
+    message: "Code verified successfully. You may now reset your password.",
+    email: normalizedEmail,
+    resetToken,
+  };
+};
+
+/**
+ * 9. Reset Password (Step 3: Update Password with Reset Token or OTP)
  */
 const resetPassword = async (payload: IResetPassword) => {
   const normalizedEmail = payload.email.toLowerCase().trim();
+
+  // Validate either resetToken or direct OTP
+  if (payload.resetToken) {
+    try {
+      const decoded = jwt.verify(
+        payload.resetToken,
+        config.jwt.secret as Secret,
+      ) as any;
+      if (
+        decoded.email !== normalizedEmail ||
+        decoded.purpose !== "reset-password"
+      ) {
+        throw new AppError("Invalid or expired password reset token.", 400);
+      }
+    } catch {
+      throw new AppError(
+        "Invalid or expired password reset token. Please restart the forgot password process.",
+        400,
+      );
+    }
+  } else if (payload.otp) {
+    const otpRecord = await prisma.otp.findFirst({
+      where: {
+        email: normalizedEmail,
+        otp: payload.otp.trim(),
+        type: "FORGOT_PASSWORD",
+      },
+    });
+
+    if (!otpRecord) {
+      throw new AppError(
+        "Invalid reset code. Please verify and try again.",
+        400,
+      );
+    }
+
+    if (otpRecord.expiresAt < new Date()) {
+      await prisma.otp.delete({ where: { id: otpRecord.id } });
+      throw new AppError(
+        "Reset code has expired. Please request a new code.",
+        400,
+      );
+    }
+
+    await prisma.otp.delete({ where: { id: otpRecord.id } });
+  } else {
+    throw new AppError("A valid reset token or OTP code is required.", 400);
+  }
 
   const user = await prisma.user.findUnique({
     where: { email: normalizedEmail },
   });
 
   if (!user) {
-    throw new AppError(
-      "No account found with this email address. Please check and try again.",
-      404
-    );
+    throw new AppError("No account found with this email address.", 404);
   }
 
   const hashedPassword = await bcrypt.hash(
     payload.newPassword,
-    Number(config.password_salt)
+    Number(config.password_salt),
   );
 
   await prisma.user.update({
@@ -391,17 +671,15 @@ const resetPassword = async (payload: IResetPassword) => {
   });
 
   return {
-    message: "Password has been successfully reset. You can now log in with your new password.",
+    message:
+      "Password has been successfully reset. You can now log in with your new password.",
   };
 };
 
 /**
- * 7. Change Password (Authenticated)
+ * 10. Change Password (Authenticated User)
  */
-const changePassword = async (
-  userId: string,
-  payload: IChangePassword
-) => {
+const changePassword = async (userId: string, payload: IChangePassword) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
@@ -410,21 +688,23 @@ const changePassword = async (
     throw new AppError("User account not found.", 404);
   }
 
-  // If user registered via social login without a password
   if (user.password) {
     const isPasswordMatched = await bcrypt.compare(
       payload.oldPassword,
-      user.password
+      user.password,
     );
 
     if (!isPasswordMatched) {
-      throw new AppError("Current password does not match. Please verify and try again.", 400);
+      throw new AppError(
+        "Current password does not match. Please verify and try again.",
+        400,
+      );
     }
   }
 
   const newHashedPassword = await bcrypt.hash(
     payload.newPassword,
-    Number(config.password_salt)
+    Number(config.password_salt),
   );
 
   await prisma.user.update({
@@ -438,7 +718,7 @@ const changePassword = async (
 };
 
 /**
- * 8. Refresh Token
+ * 11. Refresh Token
  */
 const refreshToken = async (token: string) => {
   if (!token) {
@@ -447,10 +727,11 @@ const refreshToken = async (token: string) => {
 
   let decoded: JwtPayload & { id: string; email: string; role: string };
   try {
-    decoded = jwt.verify(
-      token,
-      config.jwt.secret as Secret
-    ) as JwtPayload & { id: string; email: string; role: string };
+    decoded = jwt.verify(token, config.jwt.secret as Secret) as JwtPayload & {
+      id: string;
+      email: string;
+      role: string;
+    };
   } catch {
     throw new AppError("Invalid or expired token. Please log in again.", 401);
   }
@@ -474,12 +755,14 @@ const refreshToken = async (token: string) => {
 
 export const AuthService = {
   registerUser,
+  verifyRegistrationOtp,
+  resendOtp,
   loginUser,
   googleLogin,
   appleLogin,
   forgotPassword,
+  verifyForgotOtp,
   resetPassword,
   changePassword,
   refreshToken,
 };
-

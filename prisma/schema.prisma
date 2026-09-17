@@ -41,3 +41,20 @@ enum Role {
   admin
 }
 
+model Otp {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  email     String
+  otp       String
+  type      OtpType   @default(REGISTRATION)
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([email, type])
+}
+
+enum OtpType {
+  REGISTRATION
+  FORGOT_PASSWORD
+}
+
+

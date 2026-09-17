@@ -7,9 +7,34 @@ const registerUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.registerUser(req.body);
 
   sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
+const verifyRegistrationOtp = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.verifyRegistrationOtp(req.body);
+
+  sendResponse(res, {
     statusCode: 201,
     success: true,
-    message: "User registered successfully",
+    message: result.message,
+    data: {
+      accessToken: result.accessToken,
+      user: result.user,
+    },
+  });
+});
+
+const resendOtp = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.resendOtp(req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
     data: result,
   });
 });
@@ -54,9 +79,24 @@ const forgotPassword = catchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: result.message,
-    data: null,
+    data: result,
   });
 });
+
+const verifyForgotOtp = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.verifyForgotOtp(req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: {
+      resetToken: result.resetToken,
+      email: result.email,
+    },
+  });
+});
+
 
 const resetPassword = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.resetPassword(req.body);
@@ -95,12 +135,16 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
 
 export const AuthController = {
   registerUser,
+  verifyRegistrationOtp,
+  resendOtp,
   loginUser,
   googleLogin,
   appleLogin,
   forgotPassword,
+  verifyForgotOtp,
   resetPassword,
   changePassword,
   refreshToken,
 };
+
 

@@ -29,10 +29,22 @@ export interface IForgotPassword {
   email: string;
 }
 
+export interface IVerifyOtp {
+  email: string;
+  otp: string;
+}
+
+export interface IResendOtp {
+  email: string;
+  type?: "REGISTRATION" | "FORGOT_PASSWORD";
+}
+
 export interface IResetPassword {
   email: string;
   newPassword: string;
   confirmPassword?: string;
+  resetToken?: string;
+  otp?: string;
 }
 
 export interface IChangePassword {
@@ -44,4 +56,5 @@ export interface IChangePassword {
 export interface IRefreshToken {
   token: string;
 }
+
 

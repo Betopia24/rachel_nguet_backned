@@ -6,11 +6,23 @@ import { AuthValidation } from "./auth.validation";
 
 const router = Router();
 
-// Standard Authentication
+// Standard Authentication & Registration OTP Flow
 router.post(
   "/register",
   validateRequest(AuthValidation.registerValidationSchema),
   AuthController.registerUser
+);
+
+router.post(
+  "/verify-registration-otp",
+  validateRequest(AuthValidation.verifyOtpValidationSchema),
+  AuthController.verifyRegistrationOtp
+);
+
+router.post(
+  "/resend-otp",
+  validateRequest(AuthValidation.resendOtpValidationSchema),
+  AuthController.resendOtp
 );
 
 router.post(
@@ -32,11 +44,17 @@ router.post(
   AuthController.appleLogin
 );
 
-// Password Management
+// Password Management (Forgot Password -> OTP -> Reset Password)
 router.post(
   "/forgot-password",
   validateRequest(AuthValidation.forgotPasswordValidationSchema),
   AuthController.forgotPassword
+);
+
+router.post(
+  "/verify-forgot-otp",
+  validateRequest(AuthValidation.verifyOtpValidationSchema),
+  AuthController.verifyForgotOtp
 );
 
 router.post(
@@ -60,4 +78,5 @@ router.post(
 );
 
 export const authRoutes = router;
+
 
