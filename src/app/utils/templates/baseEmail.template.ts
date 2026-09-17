@@ -104,8 +104,9 @@ export const baseEmailTemplate = ({ title, content }: IBaseEmailOptions): string
   <div class="email-wrapper">
     <div class="email-container">
       <div class="header">
-        <div class="logo-diamond">💎</div>
-        <div class="logo-text">Diamond Pay</div>
+        <div class="logo-wrapper" style="text-align: center; margin-bottom: 8px;">
+          <img src="https://imglink.cc/cdn/FenBYK5zPZ.png" alt="Diamond Pay Logo" style="display: inline-block; max-width: 160px; height: auto; border: 0; outline: none;" />
+        </div>
         <div class="tagline">Next Generation Secure Payments</div>
       </div>
       <div class="body-content">

@@ -42,7 +42,8 @@ export const sendEmail = async ({ to, subject, html, text }: ISendEmailOptions):
     }
   } catch (error) {
     console.error(`❌ [Email]: Failed to send email to ${to}:`, error);
-    // Return false instead of crashing request flow
     return false;
   }
 };
+
+
