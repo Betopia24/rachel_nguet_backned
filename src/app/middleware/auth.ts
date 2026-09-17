@@ -18,7 +18,7 @@ export const auth = (...requiredRoles: string[]) => {
       }
 
       if (!token) {
-        throw new AppError("You are not authorized!", 401);
+        throw new AppError("Access denied. No authorization token was provided. Please log in.", 401);
       }
 
       const decoded = jwt.verify(

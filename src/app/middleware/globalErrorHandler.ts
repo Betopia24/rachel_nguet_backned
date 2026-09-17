@@ -11,6 +11,40 @@ export const globalErrorHandler = (
   const errorDetails: any = [];
   console.log(err.message, err);
 
+  // 1. JWT Errors (Invalid signature, malformed, expired)
+  if (err.name === "JsonWebTokenError") {
+    statusCode = 401;
+    if (err.message === "invalid signature") {
+      message = "Invalid token signature. Your session is invalid or has been tampered with. Please log in again.";
+    } else if (err.message === "jwt malformed") {
+      message = "Malformed authorization token. Please provide a valid token.";
+    } else {
+      message = "Invalid authorization token. Please log in again.";
+    }
+  }
+
+  if (err.name === "TokenExpiredError") {
+    statusCode = 401;
+    message = "Your login session has expired. Please log in again to continue.";
+  }
+
+  // 2. Multer File Upload Errors
+  if (err.name === "MulterError") {
+    statusCode = 400;
+    if (err.code === "LIMIT_FILE_SIZE") {
+      message = "The uploaded image exceeds the maximum allowed size of 10MB. Please choose a smaller file.";
+    } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
+      message = `Unexpected upload field '${err.field}'. Please upload your diamond image using the form-data key 'image'.`;
+    } else {
+      message = `Upload error: ${err.message}`;
+    }
+    errorDetails.push({
+      path: err.field || "image",
+      message,
+    });
+  }
+
+  // 3. Zod Validation Errors
   if (err.name === "ZodError") {
     message = err.issues?.[0]?.message || "Validation error";
     statusCode = 400;
@@ -21,6 +55,7 @@ export const globalErrorHandler = (
     });
   }
 
+  // 4. Prisma Validation Errors
   if (err.name === "PrismaClientValidationError") {
     message = "Invalid data provided";
     statusCode = 400;
@@ -38,12 +73,12 @@ export const globalErrorHandler = (
     } else {
       errorDetails.push({
         path: "",
-        message: "Invalid data provided to database",
+        message: "Invalid data format provided to database",
       });
     }
   }
 
-  // Handle Prisma known request errors (e.g. P2002 unique constraint)
+  // 5. Prisma Known Request Errors (e.g. P2002 unique constraint)
   if (err.name === "PrismaClientKnownRequestError" || err.code?.startsWith?.("P2")) {
     statusCode = 400;
 
