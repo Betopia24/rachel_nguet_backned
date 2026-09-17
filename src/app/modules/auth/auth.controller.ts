@@ -25,6 +25,50 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const googleLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.googleLogin(req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Google login successful",
+    data: result,
+  });
+});
+
+const appleLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.appleLogin(req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Apple login successful",
+    data: result,
+  });
+});
+
+const forgotPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.forgotPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: null,
+  });
+});
+
+const resetPassword = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.resetPassword(req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: null,
+  });
+});
+
 const changePassword = catchAsync(async (req: Request, res: Response) => {
   const user = req.user!;
   const result = await AuthService.changePassword(user.id, req.body);
@@ -32,8 +76,8 @@ const changePassword = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: 200,
     success: true,
-    message: "Password changed successfully",
-    data: result,
+    message: result.message,
+    data: null,
   });
 });
 
@@ -52,6 +96,11 @@ const refreshToken = catchAsync(async (req: Request, res: Response) => {
 export const AuthController = {
   registerUser,
   loginUser,
+  googleLogin,
+  appleLogin,
+  forgotPassword,
+  resetPassword,
   changePassword,
   refreshToken,
 };
+

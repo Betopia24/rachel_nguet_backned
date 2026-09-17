@@ -2,19 +2,23 @@ import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
 import { IUpdateProfile, IUpdateUserStatus } from "./user.interface";
 
+const userSelect = {
+  id: true,
+  name: true,
+  email: true,
+  avatar: true,
+  authProvider: true,
+  role: true,
+  status: true,
+  isVerified: true,
+  createdAt: true,
+  updatedAt: true,
+};
+
 const getMe = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      isVerified: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: userSelect,
   });
 
   if (!user) {
@@ -36,16 +40,7 @@ const updateMe = async (userId: string, payload: IUpdateProfile) => {
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: payload,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      isVerified: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: userSelect,
   });
 
   return updatedUser;
@@ -53,16 +48,7 @@ const updateMe = async (userId: string, payload: IUpdateProfile) => {
 
 const getAllUsers = async () => {
   const users = await prisma.user.findMany({
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      isVerified: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: userSelect,
   });
 
   return users;
@@ -71,16 +57,7 @@ const getAllUsers = async () => {
 const getUserById = async (userId: string) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      isVerified: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: userSelect,
   });
 
   if (!user) {
@@ -105,16 +82,7 @@ const updateUserStatus = async (
   const updatedUser = await prisma.user.update({
     where: { id: userId },
     data: payload,
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      role: true,
-      status: true,
-      isVerified: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    select: userSelect,
   });
 
   return updatedUser;
@@ -127,3 +95,4 @@ export const UserService = {
   getUserById,
   updateUserStatus,
 };
+

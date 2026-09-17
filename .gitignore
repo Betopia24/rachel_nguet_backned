@@ -1,4 +1,10 @@
 node_modules
+
 dist
+
 .env
+
 *.log
+
+
+Diamond_Pay_API.postman_collection.json

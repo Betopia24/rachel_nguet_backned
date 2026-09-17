@@ -12,23 +12,25 @@ export const globalErrorHandler = (
   console.log(err.message, err);
 
   if (err.name === "ZodError") {
-    message = "Validation error";
+    message = err.issues?.[0]?.message || "Validation error";
     statusCode = 400;
 
-    err.issues.forEach((error: any) => {
-      errorDetails.push({ path: error.path[0], message: error.message });
+    err.issues?.forEach((error: any) => {
+      const fieldPath = error.path?.[error.path.length - 1] || error.path?.join(".") || "field";
+      errorDetails.push({ path: fieldPath, message: error.message });
     });
   }
 
   if (err.name === "PrismaClientValidationError") {
-    message = "Validation error";
+    message = "Invalid data provided";
     statusCode = 400;
     const errorMessage = err.message;
 
-    // 🔥 field extract
+    // field extract
     const match = errorMessage.match(/Argument `(.*?)` is missing/);
 
     if (match) {
+      message = `${match[1]} is required`;
       errorDetails.push({
         path: match[1],
         message: `${match[1]} is required`,
@@ -36,7 +38,7 @@ export const globalErrorHandler = (
     } else {
       errorDetails.push({
         path: "",
-        message: "Invalid data provided",
+        message: "Invalid data provided to database",
       });
     }
   }
@@ -46,21 +48,26 @@ export const globalErrorHandler = (
     statusCode = 400;
 
     if (err.code === "P2002") {
-      const target: string = Array.isArray(err.meta?.target)
+      const rawTarget = Array.isArray(err.meta?.target)
         ? err.meta.target.join(", ")
         : (err.meta?.target as string) ?? "field";
-      message = "Er is een conflict opgetreden. Probeer het opnieuw.";
+      const target = rawTarget.replace(/_/g, " ");
+      message = `An account or record with this ${target} already exists.`;
       errorDetails.push({
-        path: target,
-        message: `Duplicate value for unique field: ${target}`,
+        path: rawTarget,
+        message: `Duplicate value for unique field: ${rawTarget}`,
       });
     } else if (err.code === "P2025") {
       statusCode = 404;
-      message = "Het gevraagde item kon niet worden gevonden.";
+      message = "The requested record was not found.";
     } else {
-      message = "Database fout. Probeer het opnieuw.";
+      message = "A database error occurred. Please try again.";
     }
   }
 
-  res.status(statusCode).json({ success: false, message, errorDetails });
+  res.status(statusCode).json({
+    success: false,
+    message,
+    errorDetails: errorDetails.length > 0 ? errorDetails : undefined,
+  });
 };
