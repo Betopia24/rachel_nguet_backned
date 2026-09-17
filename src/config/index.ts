@@ -16,7 +16,13 @@ interface Config {
     pass: string;
     from: string;
   };
+  cloudinary: {
+    cloud_name: string;
+    api_key: string;
+    api_secret: string;
+  };
 }
+
 
 const config: Config = {
   NODE_ENV: process.env.NODE_ENV || "development",
@@ -33,6 +39,11 @@ const config: Config = {
     user: process.env.SMTP_USER || "",
     pass: process.env.SMTP_PASS || "",
     from: process.env.SMTP_FROM || "Diamond Pay <no-reply@diamondpay.com>",
+  },
+  cloudinary: {
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
+    api_key: process.env.CLOUDINARY_API_KEY || "",
+    api_secret: process.env.CLOUDINARY_API_SECRET || "",
   },
 };
 

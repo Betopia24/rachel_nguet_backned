@@ -3,7 +3,10 @@ interface IBaseEmailOptions {
   content: string;
 }
 
-export const baseEmailTemplate = ({ title, content }: IBaseEmailOptions): string => `
+export const baseEmailTemplate = ({
+  title,
+  content,
+}: IBaseEmailOptions): string => `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -105,7 +108,7 @@ export const baseEmailTemplate = ({ title, content }: IBaseEmailOptions): string
     <div class="email-container">
       <div class="header">
         <div class="logo-wrapper" style="text-align: center; margin-bottom: 8px;">
-          <img src="https://imglink.cc/cdn/FenBYK5zPZ.png" alt="Diamond Pay Logo" style="display: inline-block; max-width: 160px; height: auto; border: 0; outline: none;" />
+          <img src="https://imglink.cc/cdn/rJbqyRo6Ns.png" alt="Diamond Pay Logo" style="display: inline-block; max-width: 160px; height: auto; border: 0; outline: none;" />
         </div>
         <div class="tagline">Next Generation Secure Payments</div>
       </div>
