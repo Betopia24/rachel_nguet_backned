@@ -112,7 +112,7 @@ const getDesignById = async (userId: string, designId: string) => {
 /**
  * 5. Delete Design (From Cloudinary & Database)
  */
-const deleteDesign = async (userId: string, designId: string) => {
+const deleteDesign = async (userId: string, userRole: string, designId: string) => {
   const design = await prisma.design.findUnique({
     where: { id: designId },
   });
@@ -121,7 +121,7 @@ const deleteDesign = async (userId: string, designId: string) => {
     throw new AppError("Design not found.", 404);
   }
 
-  if (design.userId !== userId) {
+  if (design.userId !== userId && userRole !== "admin") {
     throw new AppError("You do not have permission to delete this design.", 403);
   }
 

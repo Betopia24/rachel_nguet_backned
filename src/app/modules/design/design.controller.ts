@@ -55,7 +55,7 @@ const getDesignById = catchAsync(async (req: Request, res: Response) => {
 
 const deleteDesign = catchAsync(async (req: Request, res: Response) => {
   const user = req.user!;
-  const result = await DesignService.deleteDesign(user.id, req.params.id);
+  const result = await DesignService.deleteDesign(user.id, user.role, req.params.id);
 
   sendResponse(res, {
     statusCode: 200,
