@@ -123,7 +123,6 @@ const registerUser = async (payload: IRegisterUser) => {
     message:
       "Registration initiated successfully. A verification code (OTP) has been sent to your email.",
     email: normalizedEmail,
-    otp: config.NODE_ENV === "development" ? otp : undefined,
   };
 };
 
@@ -228,7 +227,6 @@ const resendOtp = async (payload: IResendOtp) => {
   return {
     message: "A new verification code has been sent to your email address.",
     email: normalizedEmail,
-    otp: config.NODE_ENV === "development" ? otp : undefined,
   };
 };
 
@@ -545,7 +543,6 @@ const forgotPassword = async (payload: IForgotPassword) => {
   return {
     message: "A password reset code (OTP) has been sent to your email address.",
     email: normalizedEmail,
-    otp: config.NODE_ENV === "development" ? otp : undefined,
   };
 };
 

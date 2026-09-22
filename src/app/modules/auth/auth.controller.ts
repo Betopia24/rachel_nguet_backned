@@ -10,7 +10,9 @@ const registerUser = catchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: result.message,
-    data: result,
+    data: {
+      email: result.email,
+    },
   });
 });
 
@@ -35,7 +37,9 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: result.message,
-    data: result,
+    data: {
+      email: result.email,
+    },
   });
 });
 
@@ -79,7 +83,9 @@ const forgotPassword = catchAsync(async (req: Request, res: Response) => {
     statusCode: 200,
     success: true,
     message: result.message,
-    data: result,
+    data: {
+      email: result.email,
+    },
   });
 });
 
