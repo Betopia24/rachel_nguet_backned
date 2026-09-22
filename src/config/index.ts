@@ -21,6 +21,12 @@ interface Config {
     api_key: string;
     api_secret: string;
   };
+  aws: {
+    access_key_id: string;
+    secret_access_key: string;
+    region: string;
+    bucket_name: string;
+  };
 }
 
 
@@ -44,6 +50,12 @@ const config: Config = {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME || "",
     api_key: process.env.CLOUDINARY_API_KEY || "",
     api_secret: process.env.CLOUDINARY_API_SECRET || "",
+  },
+  aws: {
+    access_key_id: process.env.AWS_ACCESS_KEY_ID || "",
+    secret_access_key: process.env.AWS_SECRET_ACCESS_KEY || "",
+    region: process.env.AWS_REGION || "ap-southeast-2",
+    bucket_name: process.env.AWS_BUCKET_NAME || "diamond-pay-storage",
   },
 };
 

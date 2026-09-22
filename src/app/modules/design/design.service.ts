@@ -1,10 +1,11 @@
 import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
-import { deleteFromCloudinary, uploadToCloudinary } from "../../utils/cloudinary";
+import { deleteFromCloudinary } from "../../utils/cloudinary";
+import { deleteFromS3, uploadToS3 } from "../../utils/s3";
 import { IDesignFilterOptions, IUploadDesignPayload } from "./design.interface";
 
 /**
- * 1. Upload Diamond Design to Cloudinary & Save to Database
+ * 1. Upload Diamond Design to AWS S3 & Save to Database
  */
 const uploadDesign = async (
   userId: string,
@@ -20,16 +21,16 @@ const uploadDesign = async (
   const cleanFileName = rawFileName.substring(0, rawFileName.lastIndexOf(".")) || rawFileName;
   const title = payload.title?.trim() || cleanFileName;
 
-  // Upload to Cloudinary (or local fallback)
-  const uploadResult = await uploadToCloudinary(file, "diamond_pay/designs");
+  // Upload to AWS S3
+  const uploadResult = await uploadToS3(file, "designs");
 
   // Save to MongoDB via Prisma
   const newDesign = await prisma.design.create({
     data: {
       userId,
       title,
-      imageUrl: uploadResult.secure_url,
-      publicId: uploadResult.public_id,
+      imageUrl: uploadResult.url,
+      publicId: uploadResult.key,
       fileSize: uploadResult.bytes || file.size,
       mimeType: file.mimetype,
       type: payload.type || "UPLOADED",
@@ -125,9 +126,13 @@ const deleteDesign = async (userId: string, userRole: string, designId: string) 
     throw new AppError("You do not have permission to delete this design.", 403);
   }
 
-  // Delete from Cloudinary if stored there
+  // Delete from S3 or Cloudinary if stored there
   if (design.publicId) {
-    await deleteFromCloudinary(design.publicId);
+    if (design.imageUrl?.includes("amazonaws.com") || design.publicId.startsWith("designs/")) {
+      await deleteFromS3(design.publicId);
+    } else {
+      await deleteFromCloudinary(design.publicId);
+    }
   }
 
   // Delete from database

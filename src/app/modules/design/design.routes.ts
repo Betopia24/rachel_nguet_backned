@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { auth } from "../../middleware/auth";
 import { validateRequest } from "../../middleware/validateRequest";
-import { upload } from "../../utils/cloudinary";
+import { upload } from "../../utils/s3";
 import { DesignController } from "./design.controller";
 import { DesignValidation } from "./design.validation";
 
