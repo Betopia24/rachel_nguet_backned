@@ -32,7 +32,7 @@ interface Config {
 
 const config: Config = {
   NODE_ENV: process.env.NODE_ENV || "development",
-  port: Number(process.env.PORT) || 5000,
+  port: Number(process.env.PORT) || 5289,
   database_url: process.env.DATABASE_URL || "",
   password_salt: Number(process.env.PASSWORD_SALT) || 10,
   jwt: {
