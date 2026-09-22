@@ -12,3 +12,12 @@ services:
     environment:
       - PORT=5289
       - NODE_ENV=production
+    networks:
+      - diamond_network
+
+networks:
+  diamond_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.200.52.0/24
