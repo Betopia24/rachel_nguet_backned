@@ -194,6 +194,38 @@ const resendOtp = async (payload: IResendOtp) => {
     throw new AppError("No account found with this email address.", 404);
   }
 
+  // Status check
+  if (user.status === "blocked") {
+    throw new AppError(
+      "Your account has been suspended. Please contact customer support.",
+      403,
+    );
+  }
+
+  if (user.status === "inactive") {
+    throw new AppError(
+      "Your account is currently inactive. Please contact customer support.",
+      403,
+    );
+  }
+
+  // If already verified, do not allow resending registration OTP
+  if (type === "REGISTRATION" && user.isVerified) {
+    throw new AppError(
+      "This account is already verified. Please log in directly.",
+      400,
+    );
+  }
+
+  // For password reset, social login accounts without password cannot reset password
+  if (type === "FORGOT_PASSWORD" && !user.password) {
+    const provider = user.authProvider === "google" ? "Google" : "Apple";
+    throw new AppError(
+      `This account is registered with ${provider} sign-in. Password reset is not available.`,
+      400,
+    );
+  }
+
   // Generate new OTP
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
