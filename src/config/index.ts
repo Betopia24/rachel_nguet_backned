@@ -38,6 +38,10 @@ interface Config {
     client_email: string;
     private_key: string;
   };
+  revenuecat: {
+    webhook_auth_header: string;
+    api_key: string;
+  };
 }
 
 
@@ -78,6 +82,10 @@ const config: Config = {
     project_id: process.env.FIREBASE_PROJECT_ID || "",
     client_email: process.env.FIREBASE_CLIENT_EMAIL || "",
     private_key: process.env.FIREBASE_PRIVATE_KEY || "",
+  },
+  revenuecat: {
+    webhook_auth_header: process.env.REVENUECAT_WEBHOOK_AUTH_HEADER || "",
+    api_key: process.env.REVENUECAT_API_KEY || "",
   },
 };
 

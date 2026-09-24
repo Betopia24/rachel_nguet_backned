@@ -20,10 +20,17 @@ model User {
   appleId      String?
   firebaseUid  String?
 
-  isVerified   Boolean       @default(false)
-  designs      Design[]
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  isVerified            Boolean           @default(false)
+
+  // Subscription fields
+  subscriptionTier      SubscriptionTier  @default(FREE)
+  isSubscribed          Boolean           @default(false)
+  subscriptionExpiresAt DateTime?
+
+  designs               Design[]
+  subscriptions         Subscription[]
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
 }
 
 enum AuthProvider {
@@ -90,6 +97,52 @@ enum MediaType {
   MUSIC
   AUDIO
 }
+
+model Subscription {
+  id                     String             @id @default(auto()) @map("_id") @db.ObjectId
+  userId                 String             @db.ObjectId
+  user                   User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  originalAppUserId      String?
+  appUserId              String
+  productId              String
+  entitlementId          String?
+  tier                   SubscriptionTier   @default(FREE)
+  status                 SubscriptionStatus @default(ACTIVE)
+  store                  String?            // APP_STORE, PLAY_STORE, STRIPE, etc.
+  environment            String?            // SANDBOX, PRODUCTION
+  price                  Float?
+  currency               String?            @default("USD")
+  periodType             String?
+  purchasedAt            DateTime?
+  expiresAt              DateTime?
+  cancelledAt            DateTime?
+  unsubscribeDetectedAt DateTime?
+  isTrial                Boolean            @default(false)
+  rawEvent               String?
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+
+  @@index([userId, status])
+  @@index([appUserId])
+}
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  STANDARD
+  PREMIUM
+  DESIGN_PRO
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  EXPIRED
+  CANCELLED
+  PAUSED
+  BILLING_ISSUE
+}
+
 
 
 

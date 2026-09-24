@@ -3,6 +3,7 @@ import { authRoutes } from "../modules/auth/auth.routes";
 import { userRoutes } from "../modules/user/user.routes";
 import { designRoutes } from "../modules/design/design.routes";
 import { aiRoutes } from "../modules/ai/ai.routes";
+import { subscriptionRoutes } from "../modules/subscription/subscription.routes";
 
 export const router = Router();
 
@@ -22,6 +23,10 @@ const moduleRoutes: Array<{ path: string; route: Router }> = [
   {
     path: "/ai",
     route: aiRoutes,
+  },
+  {
+    path: "/subscription",
+    route: subscriptionRoutes,
   },
 ];
 
