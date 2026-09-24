@@ -3,6 +3,7 @@ import jwt, { JwtPayload, Secret, SignOptions } from "jsonwebtoken";
 import config from "../../../config";
 import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
+import { verifyFirebaseIdToken } from "../../lib/firebase";
 import { sendEmail } from "../../utils/sendEmail";
 import {
   IAppleLogin,
@@ -338,51 +339,70 @@ const loginUser = async (payload: ILoginUser) => {
 };
 
 /**
- * 5. Google Sign-In / Login
+ * 5. Google Sign-In / Login (via Firebase Admin SDK or Google OAuth)
  */
 const googleLogin = async (payload: IGoogleLogin) => {
   let email = payload.email?.toLowerCase().trim();
   let name = payload.name?.trim();
   let googleId = payload.googleId;
   let avatar = payload.avatar;
+  let firebaseUid: string | undefined;
 
   if (payload.idToken) {
+    let verifiedViaFirebase = false;
+
+    // 1. Try Firebase Admin verification
     try {
-      const response = await fetch(
-        `https://oauth2.googleapis.com/tokeninfo?id_token=${payload.idToken}`,
-      );
-      if (response.ok) {
-        const tokenInfo: any = await response.json();
-        if (tokenInfo.email) email = tokenInfo.email.toLowerCase().trim();
-        if (tokenInfo.name && !name) name = tokenInfo.name.trim();
-        if (tokenInfo.sub) googleId = tokenInfo.sub;
-        if (tokenInfo.picture && !avatar) avatar = tokenInfo.picture;
-      } else if (!email || !googleId) {
-        throw new AppError(
-          "Invalid or expired Google authentication token.",
-          401,
-        );
+      const decodedFirebase = await verifyFirebaseIdToken(payload.idToken);
+      if (decodedFirebase) {
+        verifiedViaFirebase = true;
+        firebaseUid = decodedFirebase.uid;
+        googleId = decodedFirebase.uid;
+        if (decodedFirebase.email) email = decodedFirebase.email.toLowerCase().trim();
+        if (decodedFirebase.name && !name) name = decodedFirebase.name.trim();
+        if (decodedFirebase.picture && !avatar) avatar = decodedFirebase.picture;
       }
-    } catch (err: any) {
-      if (err instanceof AppError) throw err;
-      if (!email || !googleId) {
-        throw new AppError(
-          "Unable to verify Google credentials. Please try again.",
-          401,
+    } catch (firebaseErr: any) {
+      // If Firebase failed, fallback to standard Google OAuth tokeninfo
+      console.warn("ℹ️ [Google Login]: Firebase verify failed, falling back to Google OAuth tokeninfo:", firebaseErr.message);
+
+      try {
+        const response = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?id_token=${payload.idToken}`
         );
+        if (response.ok) {
+          const tokenInfo: any = await response.json();
+          if (tokenInfo.email) email = tokenInfo.email.toLowerCase().trim();
+          if (tokenInfo.name && !name) name = tokenInfo.name.trim();
+          if (tokenInfo.sub) googleId = tokenInfo.sub;
+          if (tokenInfo.picture && !avatar) avatar = tokenInfo.picture;
+        } else if (!email || !googleId) {
+          throw new AppError(firebaseErr.message || "Invalid or expired Google authentication token.", 401);
+        }
+      } catch (oauthErr: any) {
+        if (oauthErr instanceof AppError) throw oauthErr;
+        if (!email || !googleId) {
+          throw new AppError(
+            firebaseErr.message || "Unable to verify Google credentials. Please try again.",
+            401
+          );
+        }
       }
     }
   }
 
-  if (!email && !googleId) {
+  if (!email && !googleId && !firebaseUid) {
     throw new AppError(
-      "Google login requires a valid Google ID or email address.",
-      400,
+      "Google login requires a valid Google ID token or email address.",
+      400
     );
   }
 
   let user = null;
-  if (googleId) {
+  if (firebaseUid) {
+    user = await prisma.user.findFirst({ where: { firebaseUid } });
+  }
+  if (!user && googleId) {
     user = await prisma.user.findFirst({ where: { googleId } });
   }
   if (!user && email) {
@@ -393,32 +413,32 @@ const googleLogin = async (payload: IGoogleLogin) => {
     if (user.status === "blocked") {
       throw new AppError(
         "Your account has been suspended. Please contact customer support.",
-        403,
+        403
       );
     }
     if (user.status === "inactive") {
       throw new AppError(
         "Your account is currently inactive. Please contact customer support.",
-        403,
+        403
       );
     }
 
-    if (!user.googleId || !user.avatar) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          googleId: user.googleId || googleId,
-          avatar: user.avatar || avatar,
-          isVerified: true,
-        },
-      });
-    }
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        googleId: user.googleId || googleId,
+        firebaseUid: user.firebaseUid || firebaseUid,
+        avatar: user.avatar || avatar,
+        isVerified: true,
+      },
+    });
   } else {
     user = await prisma.user.create({
       data: {
         name: name || "Google User",
-        email: email || `${googleId}@google.user`,
+        email: email || `${googleId || firebaseUid}@google.user`,
         googleId,
+        firebaseUid,
         avatar,
         authProvider: "google",
         isVerified: true,
@@ -437,30 +457,56 @@ const googleLogin = async (payload: IGoogleLogin) => {
 };
 
 /**
- * 6. Apple Sign-In / Login
+ * 6. Apple Sign-In / Login (via Firebase Admin SDK or Apple Token)
  */
 const appleLogin = async (payload: IAppleLogin) => {
-  const { appleId, identityToken } = payload;
+  const tokenToVerify = payload.idToken || payload.identityToken;
   let email = payload.email?.toLowerCase().trim();
   let name = payload.name?.trim();
+  let appleId = payload.appleId;
+  let firebaseUid: string | undefined;
 
-  if (identityToken) {
+  if (tokenToVerify) {
+    // 1. Try Firebase Admin verification
     try {
-      const decoded = jwt.decode(identityToken) as any;
-      if (decoded && !email && decoded.email) {
-        email = decoded.email.toLowerCase().trim();
+      const decodedFirebase = await verifyFirebaseIdToken(tokenToVerify);
+      if (decodedFirebase) {
+        firebaseUid = decodedFirebase.uid;
+        appleId = decodedFirebase.uid || (decodedFirebase as any).sub;
+        if (decodedFirebase.email) email = decodedFirebase.email.toLowerCase().trim();
+        if (decodedFirebase.name && !name) name = decodedFirebase.name.trim();
       }
-    } catch {
-      // Proceed with appleId
+    } catch (firebaseErr: any) {
+      console.warn("ℹ️ [Apple Login]: Firebase verify failed, attempting direct Apple JWT decode:", firebaseErr.message);
+
+      // Fallback: standard Apple JWT decode
+      try {
+        const decoded = jwt.decode(tokenToVerify) as any;
+        if (decoded) {
+          if (!appleId && decoded.sub) appleId = decoded.sub;
+          if (decoded.email && !email) email = decoded.email.toLowerCase().trim();
+        }
+      } catch {
+        // proceed with appleId if available
+      }
+
+      if (!appleId && !email) {
+        throw new AppError(firebaseErr.message || "Invalid or expired Apple credentials.", 401);
+      }
     }
   }
 
-  if (!appleId) {
-    throw new AppError("Apple ID / Subject identifier is required.", 400);
+  if (!appleId && !firebaseUid && !email) {
+    throw new AppError("Apple ID or valid Firebase ID token is required.", 400);
   }
 
-  let user = await prisma.user.findFirst({ where: { appleId } });
-
+  let user = null;
+  if (firebaseUid) {
+    user = await prisma.user.findFirst({ where: { firebaseUid } });
+  }
+  if (!user && appleId) {
+    user = await prisma.user.findFirst({ where: { appleId } });
+  }
   if (!user && email) {
     user = await prisma.user.findUnique({ where: { email } });
   }
@@ -469,34 +515,34 @@ const appleLogin = async (payload: IAppleLogin) => {
     if (user.status === "blocked") {
       throw new AppError(
         "Your account has been suspended. Please contact customer support.",
-        403,
+        403
       );
     }
     if (user.status === "inactive") {
       throw new AppError(
         "Your account is currently inactive. Please contact customer support.",
-        403,
+        403
       );
     }
 
-    if (!user.appleId || (name && user.name === "Apple User")) {
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: {
-          appleId: user.appleId || appleId,
-          name: name || user.name,
-          isVerified: true,
-        },
-      });
-    }
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        appleId: user.appleId || appleId,
+        firebaseUid: user.firebaseUid || firebaseUid,
+        name: name || user.name,
+        isVerified: true,
+      },
+    });
   } else {
-    const fallbackEmail = email || `${appleId}@privaterelay.apple.com`;
+    const fallbackEmail = email || `${appleId || firebaseUid}@privaterelay.apple.com`;
 
     user = await prisma.user.create({
       data: {
         name: name || "Apple User",
         email: fallbackEmail,
-        appleId,
+        appleId: appleId || firebaseUid,
+        firebaseUid,
         authProvider: "apple",
         isVerified: true,
         status: "active",

@@ -18,6 +18,7 @@ model User {
   authProvider AuthProvider  @default(email)
   googleId     String?
   appleId      String?
+  firebaseUid  String?
 
   isVerified   Boolean       @default(false)
   designs      Design[]

@@ -31,6 +31,13 @@ interface Config {
     service_url: string;
     timeout_ms: number;
   };
+  firebase: {
+    service_account_key: string;
+    service_account_path: string;
+    project_id: string;
+    client_email: string;
+    private_key: string;
+  };
 }
 
 
@@ -64,6 +71,13 @@ const config: Config = {
   ai: {
     service_url: process.env.AI_SERVICE_URL || "http://206.162.244.175:4444",
     timeout_ms: Number(process.env.AI_SERVICE_TIMEOUT_MS) || 180000, // 3 minutes timeout for video/music generation
+  },
+  firebase: {
+    service_account_key: process.env.FIREBASE_SERVICE_ACCOUNT_KEY || "",
+    service_account_path: process.env.FIREBASE_SERVICE_ACCOUNT_PATH || "",
+    project_id: process.env.FIREBASE_PROJECT_ID || "",
+    client_email: process.env.FIREBASE_CLIENT_EMAIL || "",
+    private_key: process.env.FIREBASE_PRIVATE_KEY || "",
   },
 };
 

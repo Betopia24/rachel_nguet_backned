@@ -40,6 +40,7 @@ COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/dist ./dist
+COPY firebase-service-account.json* ./
 
 # Create uploads directory for static assets
 RUN mkdir -p uploads

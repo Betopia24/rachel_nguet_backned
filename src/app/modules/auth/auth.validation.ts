@@ -60,12 +60,18 @@ const googleLoginValidationSchema = z.object({
 });
 
 const appleLoginValidationSchema = z.object({
-  body: z.object({
-    appleId: z.string({ required_error: "Apple ID / Sub is required" }),
-    identityToken: z.string().optional(),
-    email: z.string().email("Invalid email format").optional().or(z.literal("")),
-    name: z.string().optional(),
-  }),
+  body: z
+    .object({
+      idToken: z.string().optional(),
+      identityToken: z.string().optional(),
+      appleId: z.string().optional(),
+      email: z.string().email("Invalid email format").optional().or(z.literal("")),
+      name: z.string().optional(),
+    })
+    .refine((data) => data.idToken || data.identityToken || data.appleId, {
+      message: "Firebase ID token or Apple identityToken / appleId must be provided",
+      path: ["idToken"],
+    }),
 });
 
 const forgotPasswordValidationSchema = z.object({

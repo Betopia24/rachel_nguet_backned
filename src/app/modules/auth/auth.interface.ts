@@ -19,8 +19,9 @@ export interface IGoogleLogin {
 }
 
 export interface IAppleLogin {
+  idToken?: string;
   identityToken?: string;
-  appleId: string;
+  appleId?: string;
   email?: string;
   name?: string;
 }
