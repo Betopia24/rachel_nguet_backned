@@ -44,6 +44,23 @@ const generateAccessToken = (user: {
   });
 };
 
+// Utility: Generate JWT Refresh Token
+const generateRefreshToken = (user: {
+  id: string;
+  email: string;
+  role: string;
+}) => {
+  const jwtPayload = {
+    id: user.id,
+    email: user.email,
+    role: user.role,
+  };
+
+  return jwt.sign(jwtPayload, config.jwt.refresh_secret as Secret, {
+    expiresIn: config.jwt.refresh_expire_in as SignOptions["expiresIn"],
+  });
+};
+
 /**
  * 1. Register User (Step 1: Save User & Send OTP)
  */
@@ -172,9 +189,11 @@ const verifyRegistrationOtp = async (payload: IVerifyOtp) => {
   });
 
   const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
 
   return {
     accessToken,
+    refreshToken,
     user: sanitizeUser(user),
     message: "Account verified successfully! Welcome to Diamond Pay.",
   };
@@ -331,9 +350,11 @@ const loginUser = async (payload: ILoginUser) => {
   }
 
   const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
 
   return {
     accessToken,
+    refreshToken,
     user: sanitizeUser(user),
   };
 };
@@ -449,9 +470,11 @@ const googleLogin = async (payload: IGoogleLogin) => {
   }
 
   const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
 
   return {
     accessToken,
+    refreshToken,
     user: sanitizeUser(user),
   };
 };
@@ -552,9 +575,11 @@ const appleLogin = async (payload: IAppleLogin) => {
   }
 
   const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
 
   return {
     accessToken,
+    refreshToken,
     user: sanitizeUser(user),
   };
 };
@@ -802,11 +827,26 @@ const refreshToken = async (token: string) => {
 
   let decoded: JwtPayload & { id: string; email: string; role: string };
   try {
-    decoded = jwt.verify(token, config.jwt.secret as Secret) as JwtPayload & {
-      id: string;
-      email: string;
-      role: string;
-    };
+    try {
+      decoded = jwt.verify(
+        token,
+        config.jwt.refresh_secret as Secret
+      ) as JwtPayload & {
+        id: string;
+        email: string;
+        role: string;
+      };
+    } catch {
+      // Fallback for tokens signed with main secret
+      decoded = jwt.verify(
+        token,
+        config.jwt.secret as Secret
+      ) as JwtPayload & {
+        id: string;
+        email: string;
+        role: string;
+      };
+    }
   } catch {
     throw new AppError("Invalid or expired token. Please log in again.", 401);
   }
@@ -824,8 +864,12 @@ const refreshToken = async (token: string) => {
   }
 
   const accessToken = generateAccessToken(user);
+  const newRefreshToken = generateRefreshToken(user);
 
-  return { accessToken };
+  return {
+    accessToken,
+    refreshToken: newRefreshToken,
+  };
 };
 
 export const AuthService = {

@@ -8,6 +8,8 @@ interface Config {
   jwt: {
     secret: string;
     expire_in: string;
+    refresh_secret: string;
+    refresh_expire_in: string;
   };
   smtp: {
     host: string;
@@ -53,6 +55,8 @@ const config: Config = {
   jwt: {
     secret: process.env.JWT_SECRET || "secret",
     expire_in: process.env.JWT_EXPIRES_IN || "7d",
+    refresh_secret: process.env.JWT_REFRESH_SECRET || process.env.JWT_SECRET || "refresh_secret",
+    refresh_expire_in: process.env.JWT_REFRESH_EXPIRES_IN || "30d",
   },
   smtp: {
     host: process.env.SMTP_HOST || "smtp.gmail.com",

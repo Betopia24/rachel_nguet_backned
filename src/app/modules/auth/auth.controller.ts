@@ -1,7 +1,14 @@
 import { Request, Response } from "express";
+import config from "../../../config";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { AuthService } from "./auth.service";
+
+const cookieOptions = {
+  httpOnly: true,
+  secure: config.NODE_ENV === "production",
+  sameSite: "lax" as const,
+};
 
 const registerUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.registerUser(req.body);
@@ -19,12 +26,17 @@ const registerUser = catchAsync(async (req: Request, res: Response) => {
 const verifyRegistrationOtp = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.verifyRegistrationOtp(req.body);
 
+  if (result.refreshToken) {
+    res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  }
+
   sendResponse(res, {
     statusCode: 201,
     success: true,
     message: result.message,
     data: {
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       user: result.user,
     },
   });
@@ -46,6 +58,10 @@ const resendOtp = catchAsync(async (req: Request, res: Response) => {
 const loginUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.loginUser(req.body);
 
+  if (result.refreshToken) {
+    res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  }
+
   sendResponse(res, {
     statusCode: 200,
     success: true,
@@ -57,6 +73,10 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
 const googleLogin = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.googleLogin(req.body);
 
+  if (result.refreshToken) {
+    res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  }
+
   sendResponse(res, {
     statusCode: 200,
     success: true,
@@ -67,6 +87,10 @@ const googleLogin = catchAsync(async (req: Request, res: Response) => {
 
 const appleLogin = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.appleLogin(req.body);
+
+  if (result.refreshToken) {
+    res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  }
 
   sendResponse(res, {
     statusCode: 200,
@@ -128,8 +152,12 @@ const changePassword = catchAsync(async (req: Request, res: Response) => {
 });
 
 const refreshToken = catchAsync(async (req: Request, res: Response) => {
-  const token = req.cookies?.refreshToken || req.body?.token;
+  const token = req.cookies?.refreshToken || req.body?.refreshToken || req.body?.token;
   const result = await AuthService.refreshToken(token);
+
+  if (result.refreshToken) {
+    res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  }
 
   sendResponse(res, {
     statusCode: 200,

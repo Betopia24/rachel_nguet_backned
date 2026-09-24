@@ -165,18 +165,32 @@ const changePasswordValidationSchema = z.object({
     ),
 });
 
-const refreshTokenValidationSchema = z.object({
-  cookies: z
-    .object({
-      refreshToken: z.string({ required_error: "Refresh token is required" }),
-    })
-    .optional(),
-  body: z
-    .object({
-      token: z.string().optional(),
-    })
-    .optional(),
-});
+const refreshTokenValidationSchema = z
+  .object({
+    cookies: z
+      .object({
+        refreshToken: z.string().optional(),
+      })
+      .optional(),
+    body: z
+      .object({
+        refreshToken: z.string().optional(),
+        token: z.string().optional(),
+      })
+      .optional(),
+  })
+  .refine(
+    (data) =>
+      Boolean(
+        data.cookies?.refreshToken ||
+          data.body?.refreshToken ||
+          data.body?.token,
+      ),
+    {
+      message: "Refresh token is required in cookies or request body (refreshToken or token).",
+      path: ["body"],
+    },
+  );
 
 export const AuthValidation = {
 
