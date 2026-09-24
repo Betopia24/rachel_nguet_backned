@@ -17,7 +17,16 @@ const getMe = catchAsync(async (req: Request, res: Response) => {
 
 const updateMe = catchAsync(async (req: Request, res: Response) => {
   const user = req.user!;
-  const result = await UserService.updateMe(user.id, req.body);
+
+  // Support file upload under 'file', 'avatar', 'image', or 'profileImage'
+  const file =
+    req.file ||
+    (req.files as any)?.file?.[0] ||
+    (req.files as any)?.avatar?.[0] ||
+    (req.files as any)?.image?.[0] ||
+    (req.files as any)?.profileImage?.[0];
+
+  const result = await UserService.updateMe(user.id, req.body, file);
 
   sendResponse(res, {
     statusCode: 200,

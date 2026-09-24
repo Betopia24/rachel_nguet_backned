@@ -1,5 +1,6 @@
 import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
+import { uploadToS3 } from "../../utils/s3";
 import { IUpdateProfile, IUpdateUserStatus } from "./user.interface";
 
 const userSelect = {
@@ -28,7 +29,11 @@ const getMe = async (userId: string) => {
   return user;
 };
 
-const updateMe = async (userId: string, payload: IUpdateProfile) => {
+const updateMe = async (
+  userId: string,
+  payload: IUpdateProfile,
+  file?: Express.Multer.File
+) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
   });
@@ -37,9 +42,25 @@ const updateMe = async (userId: string, payload: IUpdateProfile) => {
     throw new AppError("User not found", 404);
   }
 
+  let avatarUrl = payload.avatar;
+
+  // If a file was uploaded in form-data, upload it to AWS S3 'avatars' folder
+  if (file) {
+    const uploadResult = await uploadToS3(file, "avatars");
+    avatarUrl = uploadResult.url;
+  }
+
+  const updateData: any = {};
+  if (payload.name !== undefined && typeof payload.name === "string" && payload.name.trim() !== "") {
+    updateData.name = payload.name.trim();
+  }
+  if (avatarUrl !== undefined && avatarUrl !== null && avatarUrl !== "") {
+    updateData.avatar = avatarUrl;
+  }
+
   const updatedUser = await prisma.user.update({
     where: { id: userId },
-    data: payload,
+    data: updateData,
     select: userSelect,
   });
 

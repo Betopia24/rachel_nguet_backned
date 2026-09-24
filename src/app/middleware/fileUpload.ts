@@ -84,3 +84,11 @@ export const uploadAudio = multer({
   },
   fileFilter: audioFilter,
 });
+
+export const uploadAvatar = uploadImage.fields([
+  { name: "file", maxCount: 1 },
+  { name: "avatar", maxCount: 1 },
+  { name: "image", maxCount: 1 },
+  { name: "profileImage", maxCount: 1 },
+]);
+

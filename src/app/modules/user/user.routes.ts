@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { auth } from "../../middleware/auth";
+import { uploadAvatar } from "../../middleware/fileUpload";
+import { parseBodyData } from "../../middleware/parseBodyData";
 import { validateRequest } from "../../middleware/validateRequest";
 import { UserController } from "./user.controller";
 import { UserValidation } from "./user.validation";
@@ -11,6 +13,8 @@ router.get("/me", auth("user", "admin"), UserController.getMe);
 router.patch(
   "/me",
   auth("user", "admin"),
+  uploadAvatar,
+  parseBodyData,
   validateRequest(UserValidation.updateProfileValidationSchema),
   UserController.updateMe
 );
