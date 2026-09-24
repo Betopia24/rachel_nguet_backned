@@ -37,6 +37,13 @@ router.get(
   DesignController.getDesignById
 );
 
+// Update specific design (e.g. rename title)
+router.patch(
+  "/:id",
+  auth("user", "admin"),
+  DesignController.updateDesign
+);
+
 // Delete specific design by ID
 router.delete(
   "/:id",

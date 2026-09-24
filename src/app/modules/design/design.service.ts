@@ -44,23 +44,43 @@ const uploadDesign = async (
 };
 
 /**
- * 2. Get All Designs for Authenticated User (with pagination, mediaType, type & search filters)
+ * 2. Get All Designs for Authenticated User
+ * Supports tabs matching the UI: "All", "Generated", "Uploaded", "Video", "Music"
+ * Along with pagination, search, and category counts breakdown.
  */
 const getMyDesigns = async (
   userId: string,
   filters: IDesignFilterOptions
 ) => {
-  const { type, mediaType, search, page = 1, limit = 20 } = filters;
+  const { tab, type, mediaType, search, page = 1, limit = 20 } = filters;
   const skip = (Number(page) - 1) * Number(limit);
   const take = Number(limit);
 
   const whereCondition: any = { userId };
-  if (type) {
+
+  // 1. Tab filter (All, Generated, Uploaded, Video, Music)
+  if (tab) {
+    const normalizedTab = tab.trim().toLowerCase();
+    if (normalizedTab === "generated") {
+      whereCondition.type = "AI_GENERATED";
+    } else if (normalizedTab === "uploaded") {
+      whereCondition.type = "UPLOADED";
+    } else if (normalizedTab === "video") {
+      whereCondition.mediaType = "VIDEO";
+    } else if (normalizedTab === "music") {
+      whereCondition.mediaType = { in: ["MUSIC", "AUDIO"] };
+    }
+  }
+
+  // 2. Direct filters (if passed explicitly and not already set by tab)
+  if (type && !whereCondition.type) {
     whereCondition.type = type;
   }
-  if (mediaType) {
+  if (mediaType && !whereCondition.mediaType) {
     whereCondition.mediaType = mediaType;
   }
+
+  // 3. Search filter by title or prompt
   if (search && search.trim().length > 0) {
     whereCondition.OR = [
       { title: { contains: search.trim(), mode: "insensitive" } },
@@ -68,7 +88,16 @@ const getMyDesigns = async (
     ];
   }
 
-  const [designs, total] = await Promise.all([
+  // 4. Run queries in parallel: paginated items, filtered count, and breakdown counts for tabs
+  const [
+    designs,
+    filteredTotal,
+    totalDesigns,
+    generatedCount,
+    uploadedCount,
+    videoCount,
+    musicCount,
+  ] = await Promise.all([
     prisma.design.findMany({
       where: whereCondition,
       orderBy: { createdAt: "desc" },
@@ -76,14 +105,31 @@ const getMyDesigns = async (
       take,
     }),
     prisma.design.count({ where: whereCondition }),
+    prisma.design.count({ where: { userId } }),
+    prisma.design.count({ where: { userId, type: "AI_GENERATED" } }),
+    prisma.design.count({ where: { userId, type: "UPLOADED" } }),
+    prisma.design.count({ where: { userId, mediaType: "VIDEO" } }),
+    prisma.design.count({
+      where: { userId, mediaType: { in: ["MUSIC", "AUDIO"] } },
+    }),
   ]);
 
   return {
     meta: {
-      total,
+      total: filteredTotal,
       page: Number(page),
       limit: Number(limit),
-      totalPages: Math.ceil(total / take),
+      totalPages: Math.ceil(filteredTotal / take),
+    },
+    stats: {
+      totalDesigns,
+      counts: {
+        all: totalDesigns,
+        generated: generatedCount,
+        uploaded: uploadedCount,
+        video: videoCount,
+        music: musicCount,
+      },
     },
     data: designs,
   };
@@ -159,10 +205,42 @@ const deleteDesign = async (userId: string, userRole: string, designId: string) 
   return { message: "Design deleted successfully." };
 };
 
+/**
+ * 6. Update Design (e.g. rename title)
+ */
+const updateDesign = async (
+  userId: string,
+  designId: string,
+  payload: { title?: string }
+) => {
+  const design = await prisma.design.findUnique({
+    where: { id: designId },
+  });
+
+  if (!design) {
+    throw new AppError("Design not found.", 404);
+  }
+
+  if (design.userId !== userId) {
+    throw new AppError("You do not have permission to update this design.", 403);
+  }
+
+  const updated = await prisma.design.update({
+    where: { id: designId },
+    data: {
+      ...(payload.title ? { title: payload.title.trim() } : {}),
+    },
+  });
+
+  return updated;
+};
+
 export const DesignService = {
   uploadDesign,
   getMyDesigns,
   getRecentDesigns,
   getDesignById,
+  updateDesign,
   deleteDesign,
 };
+

@@ -25,6 +25,7 @@ const getMyDesigns = catchAsync(async (req: Request, res: Response) => {
     message: "Designs retrieved successfully",
     data: result.data,
     metaData: result.meta,
+    stats: result.stats,
   });
 });
 
@@ -54,6 +55,18 @@ const getDesignById = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateDesign = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user!;
+  const result = await DesignService.updateDesign(user.id, req.params.id, req.body);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: "Design updated successfully",
+    data: result,
+  });
+});
+
 const deleteDesign = catchAsync(async (req: Request, res: Response) => {
   const user = req.user!;
   const result = await DesignService.deleteDesign(user.id, user.role, req.params.id);
@@ -71,5 +84,6 @@ export const DesignController = {
   getMyDesigns,
   getRecentDesigns,
   getDesignById,
+  updateDesign,
   deleteDesign,
 };
