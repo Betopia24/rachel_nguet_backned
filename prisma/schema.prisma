@@ -64,21 +64,32 @@ model Design {
   user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   title        String
   imageUrl     String
+  mediaType    MediaType   @default(IMAGE)
   publicId     String?
   fileSize     Int?
   mimeType     String?
   type         DesignType  @default(UPLOADED)
   prompt       String?
+  duration     Int?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   @@index([userId, createdAt])
+  @@index([userId, mediaType])
 }
 
 enum DesignType {
   UPLOADED
   AI_GENERATED
 }
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  MUSIC
+  AUDIO
+}
+
 
 
 

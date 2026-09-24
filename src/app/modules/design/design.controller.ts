@@ -31,7 +31,8 @@ const getMyDesigns = catchAsync(async (req: Request, res: Response) => {
 const getRecentDesigns = catchAsync(async (req: Request, res: Response) => {
   const user = req.user!;
   const limit = req.query.limit ? Number(req.query.limit) : 5;
-  const result = await DesignService.getRecentDesigns(user.id, limit);
+  const mediaType = req.query.mediaType as any;
+  const result = await DesignService.getRecentDesigns(user.id, limit, mediaType);
 
   sendResponse(res, {
     statusCode: 200,

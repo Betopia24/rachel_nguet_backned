@@ -34,7 +34,9 @@ const uploadDesign = async (
       fileSize: uploadResult.bytes || file.size,
       mimeType: file.mimetype,
       type: payload.type || "UPLOADED",
+      mediaType: payload.mediaType || "IMAGE",
       prompt: payload.prompt || null,
+      duration: payload.duration || null,
     },
   });
 
@@ -42,19 +44,28 @@ const uploadDesign = async (
 };
 
 /**
- * 2. Get All Designs for Authenticated User
+ * 2. Get All Designs for Authenticated User (with pagination, mediaType, type & search filters)
  */
 const getMyDesigns = async (
   userId: string,
   filters: IDesignFilterOptions
 ) => {
-  const { type, page = 1, limit = 20 } = filters;
+  const { type, mediaType, search, page = 1, limit = 20 } = filters;
   const skip = (Number(page) - 1) * Number(limit);
   const take = Number(limit);
 
   const whereCondition: any = { userId };
   if (type) {
     whereCondition.type = type;
+  }
+  if (mediaType) {
+    whereCondition.mediaType = mediaType;
+  }
+  if (search && search.trim().length > 0) {
+    whereCondition.OR = [
+      { title: { contains: search.trim(), mode: "insensitive" } },
+      { prompt: { contains: search.trim(), mode: "insensitive" } },
+    ];
   }
 
   const [designs, total] = await Promise.all([
@@ -81,9 +92,14 @@ const getMyDesigns = async (
 /**
  * 3. Get Recent Designs for Home Screen
  */
-const getRecentDesigns = async (userId: string, limit = 5) => {
+const getRecentDesigns = async (userId: string, limit = 5, mediaType?: any) => {
+  const whereCondition: any = { userId };
+  if (mediaType) {
+    whereCondition.mediaType = mediaType;
+  }
+
   const recentDesigns = await prisma.design.findMany({
-    where: { userId },
+    where: whereCondition,
     orderBy: { createdAt: "desc" },
     take: Number(limit),
   });

@@ -32,14 +32,14 @@ export const globalErrorHandler = (
   if (err.name === "MulterError") {
     statusCode = 400;
     if (err.code === "LIMIT_FILE_SIZE") {
-      message = "The uploaded image exceeds the maximum allowed size of 10MB. Please choose a smaller file.";
+      message = "The uploaded file exceeds the maximum allowed size limit. Please choose a smaller file.";
     } else if (err.code === "LIMIT_UNEXPECTED_FILE") {
-      message = `Unexpected upload field '${err.field}'. Please upload your diamond image using the form-data key 'image'.`;
+      message = `Unexpected upload field '${err.field}'. Please verify the required form-data field name (e.g. 'image' or 'audio').`;
     } else {
       message = `Upload error: ${err.message}`;
     }
     errorDetails.push({
-      path: err.field || "image",
+      path: err.field || "file",
       message,
     });
   }

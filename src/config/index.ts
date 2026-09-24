@@ -27,6 +27,10 @@ interface Config {
     region: string;
     bucket_name: string;
   };
+  ai: {
+    service_url: string;
+    timeout_ms: number;
+  };
 }
 
 
@@ -56,6 +60,10 @@ const config: Config = {
     secret_access_key: process.env.AWS_SECRET_ACCESS_KEY || "",
     region: process.env.AWS_REGION || "ap-southeast-2",
     bucket_name: process.env.AWS_BUCKET_NAME || "diamond-pay-storage",
+  },
+  ai: {
+    service_url: process.env.AI_SERVICE_URL || "http://206.162.244.175:4444",
+    timeout_ms: Number(process.env.AI_SERVICE_TIMEOUT_MS) || 180000, // 3 minutes timeout for video/music generation
   },
 };
 
