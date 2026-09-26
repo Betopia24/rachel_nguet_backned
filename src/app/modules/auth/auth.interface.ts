@@ -11,7 +11,8 @@ export interface ILoginUser {
 }
 
 export interface IGoogleLogin {
-  idToken?: string;
+  idToken: string;
+  fcmToken?: string;
   googleId?: string;
   email?: string;
   name?: string;
@@ -21,6 +22,7 @@ export interface IGoogleLogin {
 export interface IAppleLogin {
   idToken?: string;
   identityToken?: string;
+  fcmToken?: string;
   appleId?: string;
   email?: string;
   name?: string;

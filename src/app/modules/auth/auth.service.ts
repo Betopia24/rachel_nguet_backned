@@ -450,6 +450,7 @@ const googleLogin = async (payload: IGoogleLogin) => {
         googleId: user.googleId || googleId,
         firebaseUid: user.firebaseUid || firebaseUid,
         avatar: user.avatar || avatar,
+        fcmToken: payload.fcmToken ? payload.fcmToken.trim() : user.fcmToken,
         isVerified: true,
       },
     });
@@ -461,6 +462,7 @@ const googleLogin = async (payload: IGoogleLogin) => {
         googleId,
         firebaseUid,
         avatar,
+        fcmToken: payload.fcmToken ? payload.fcmToken.trim() : null,
         authProvider: "google",
         isVerified: true,
         status: "active",
@@ -554,6 +556,7 @@ const appleLogin = async (payload: IAppleLogin) => {
         appleId: user.appleId || appleId,
         firebaseUid: user.firebaseUid || firebaseUid,
         name: name || user.name,
+        fcmToken: payload.fcmToken ? payload.fcmToken.trim() : user.fcmToken,
         isVerified: true,
       },
     });
@@ -566,6 +569,7 @@ const appleLogin = async (payload: IAppleLogin) => {
         email: fallbackEmail,
         appleId: appleId || firebaseUid,
         firebaseUid,
+        fcmToken: payload.fcmToken ? payload.fcmToken.trim() : null,
         authProvider: "apple",
         isVerified: true,
         status: "active",

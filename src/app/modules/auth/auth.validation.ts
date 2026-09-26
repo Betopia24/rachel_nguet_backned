@@ -45,18 +45,14 @@ const loginValidationSchema = z.object({
 });
 
 const googleLoginValidationSchema = z.object({
-  body: z
-    .object({
-      idToken: z.string().optional(),
-      googleId: z.string().optional(),
-      email: z.string().email("Please provide a valid email address").optional(),
-      name: z.string().optional(),
-      avatar: z.string().optional(),
-    })
-    .refine((data) => data.idToken || (data.email && data.googleId), {
-      message: "Either Google ID token or email and Google ID must be provided",
-      path: ["idToken"],
-    }),
+  body: z.object({
+    idToken: z.string({ required_error: "Google idToken is required" }),
+    fcmToken: z.string().optional(),
+    googleId: z.string().optional(),
+    email: z.string().email("Please provide a valid email address").optional(),
+    name: z.string().optional(),
+    avatar: z.string().optional(),
+  }),
 });
 
 const appleLoginValidationSchema = z.object({
@@ -64,13 +60,14 @@ const appleLoginValidationSchema = z.object({
     .object({
       idToken: z.string().optional(),
       identityToken: z.string().optional(),
+      fcmToken: z.string().optional(),
       appleId: z.string().optional(),
       email: z.string().email("Invalid email format").optional().or(z.literal("")),
       name: z.string().optional(),
     })
     .refine((data) => data.idToken || data.identityToken || data.appleId, {
-      message: "Firebase ID token or Apple identityToken / appleId must be provided",
-      path: ["idToken"],
+      message: "Apple identityToken or idToken is required",
+      path: ["identityToken"],
     }),
 });
 
