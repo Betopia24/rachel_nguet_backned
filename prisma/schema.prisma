@@ -21,6 +21,7 @@ model User {
   firebaseUid  String?
 
   isVerified            Boolean           @default(false)
+  fcmToken              String?
 
   // Subscription fields
   subscriptionTier      SubscriptionTier  @default(FREE)
@@ -29,6 +30,7 @@ model User {
 
   designs               Design[]
   subscriptions         Subscription[]
+  notifications         Notification[]
   createdAt             DateTime          @default(now())
   updatedAt             DateTime          @updatedAt
 }
@@ -143,7 +145,26 @@ enum SubscriptionStatus {
   BILLING_ISSUE
 }
 
+model Notification {
+  id        String           @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String           @db.ObjectId
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String
+  type      NotificationType @default(GENERAL)
+  metadata  Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
 
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
+}
 
-
-
+enum NotificationType {
+  GENERAL
+  SUBSCRIPTION_SUCCESS
+  SUBSCRIPTION_FAILED
+  DESIGN_CREATED
+  ADMIN_ALERT
+}

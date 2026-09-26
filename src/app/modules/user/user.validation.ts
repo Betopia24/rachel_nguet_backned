@@ -18,7 +18,14 @@ const updateUserStatusValidationSchema = z.object({
   }),
 });
 
+const updateFcmTokenValidationSchema = z.object({
+  body: z.object({
+    fcmToken: z.string({ required_error: "fcmToken is required" }),
+  }),
+});
+
 export const UserValidation = {
   updateProfileValidationSchema,
   updateUserStatusValidationSchema,
+  updateFcmTokenValidationSchema,
 };

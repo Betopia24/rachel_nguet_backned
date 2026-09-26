@@ -4,6 +4,7 @@ import { userRoutes } from "../modules/user/user.routes";
 import { designRoutes } from "../modules/design/design.routes";
 import { aiRoutes } from "../modules/ai/ai.routes";
 import { subscriptionRoutes } from "../modules/subscription/subscription.routes";
+import { notificationRoutes } from "../modules/notification/notification.routes";
 
 export const router = Router();
 
@@ -27,6 +28,10 @@ const moduleRoutes: Array<{ path: string; route: Router }> = [
   {
     path: "/subscription",
     route: subscriptionRoutes,
+  },
+  {
+    path: "/notification",
+    route: notificationRoutes,
   },
 ];
 

@@ -109,11 +109,25 @@ const updateUserStatus = async (
   return updatedUser;
 };
 
+const updateFcmToken = async (userId: string, fcmToken: string) => {
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { fcmToken: fcmToken ? fcmToken.trim() : null },
+    select: { id: true, email: true, fcmToken: true },
+  });
+
+  return {
+    fcmToken: updated.fcmToken,
+    message: fcmToken ? "FCM token updated successfully." : "FCM token removed successfully.",
+  };
+};
+
 export const UserService = {
   getMe,
   updateMe,
   getAllUsers,
   getUserById,
   updateUserStatus,
+  updateFcmToken,
 };
 

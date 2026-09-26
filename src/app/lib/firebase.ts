@@ -1,5 +1,6 @@
 import { cert, initializeApp, getApps, App } from "firebase-admin/app";
 import { getAuth, DecodedIdToken } from "firebase-admin/auth";
+import { getMessaging } from "firebase-admin/messaging";
 import fs from "fs";
 import path from "path";
 import config from "../../config";
@@ -111,4 +112,15 @@ export const verifyFirebaseIdToken = async (idToken: string): Promise<DecodedIdT
       401
     );
   }
+};
+
+/**
+ * Get Firebase Cloud Messaging instance
+ */
+export const getFirebaseMessaging = () => {
+  const isReady = initFirebase();
+  if (!isReady || getApps().length === 0) {
+    return null;
+  }
+  return getMessaging(getApps()[0]);
 };

@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma";
 import { deleteFromCloudinary } from "../../utils/cloudinary";
 import { deleteFromS3, uploadToS3 } from "../../utils/s3";
 import { IDesignFilterOptions, IUploadDesignPayload } from "./design.interface";
+import { NotificationService } from "../notification/notification.service";
 
 /**
  * 1. Upload Diamond Design to AWS S3 & Save to Database
@@ -39,6 +40,22 @@ const uploadDesign = async (
       duration: payload.duration || null,
     },
   });
+
+  // Trigger push & in-app notification for uploaded design
+  NotificationService.sendNotification({
+    userId,
+    title: "✨ Design Uploaded Successfully!",
+    body: `Your diamond design "${newDesign.title}" has been saved to My Designs.`,
+    type: "DESIGN_CREATED",
+    metadata: {
+      designId: newDesign.id,
+      mediaType: newDesign.mediaType,
+      type: newDesign.type,
+      imageUrl: newDesign.imageUrl,
+    },
+  }).catch((err) =>
+    console.error("⚠️ [Design Upload Notification Error]:", err?.message || err)
+  );
 
   return newDesign;
 };

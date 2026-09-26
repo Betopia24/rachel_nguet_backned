@@ -4,6 +4,7 @@ import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
 import { mapProductToTier, SUBSCRIPTION_PLANS } from "./subscription.constant";
 import { IRevenueCatWebhookPayload } from "./subscription.interface";
+import { NotificationService } from "../notification/notification.service";
 
 /**
  * 1. Process RevenueCat Webhook Events
@@ -152,6 +153,58 @@ const handleWebhookEvent = async (
       rawEvent: JSON.stringify(event),
     },
   });
+
+  // 5. Send Push & In-App Notification based on Subscription Outcome
+  try {
+    if (subscriptionStatus === "ACTIVE" || subscriptionStatus === "TRIAL") {
+      const isRenewal = event.type === "RENEWAL";
+      await NotificationService.sendNotification({
+        userId: user.id,
+        title: isRenewal ? "💎 Subscription Renewed!" : "💎 Subscription Activated!",
+        body: isRenewal
+          ? `Your ${userTier} subscription has been renewed successfully.`
+          : `Congratulations! Your subscription to ${userTier} is now active. Enjoy all premium features!`,
+        type: "SUBSCRIPTION_SUCCESS",
+        metadata: {
+          tier: userTier,
+          status: subscriptionStatus,
+          eventType: event.type,
+          productId: event.product_id,
+        },
+      });
+    } else if (subscriptionStatus === "BILLING_ISSUE") {
+      await NotificationService.sendNotification({
+        userId: user.id,
+        title: "⚠️ Subscription Payment Issue",
+        body: `Payment for your ${userTier} subscription could not be processed. Please update your payment method.`,
+        type: "SUBSCRIPTION_FAILED",
+        metadata: {
+          tier: userTier,
+          status: subscriptionStatus,
+          eventType: event.type,
+          productId: event.product_id,
+        },
+      });
+    } else if (subscriptionStatus === "CANCELLED" || subscriptionStatus === "EXPIRED") {
+      await NotificationService.sendNotification({
+        userId: user.id,
+        title: subscriptionStatus === "CANCELLED" ? "Subscription Cancelled" : "Subscription Expired",
+        body:
+          subscriptionStatus === "CANCELLED"
+            ? `Your ${userTier} subscription has been cancelled.`
+            : `Your ${userTier} subscription has expired. Renew today to keep enjoying premium features.`,
+        type: "SUBSCRIPTION_FAILED",
+        metadata: {
+          tier: userTier,
+          status: subscriptionStatus,
+          eventType: event.type,
+          productId: event.product_id,
+        },
+      });
+    }
+  } catch (notifyErr: any) {
+    console.error("⚠️ [Subscription Notification Error]:", notifyErr?.message || notifyErr);
+  }
 
   console.log(
     `✅ [RevenueCat Webhook Processed]: User ${user.email} -> Tier: ${userTier}, Subscribed: ${isSubscribed}, Status: ${subscriptionStatus}`

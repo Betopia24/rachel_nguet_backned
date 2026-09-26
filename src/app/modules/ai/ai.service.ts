@@ -12,6 +12,7 @@ import {
   ITextToMusicPayload,
   ITextToVideoPayload,
 } from "./ai.interface";
+import { NotificationService } from "../notification/notification.service";
 
 /**
  * Universal helper for making HTTP requests to FastAPI AI Microservice
@@ -109,6 +110,31 @@ const callAIService = async <T>(
 };
 
 /**
+ * Helper to dispatch push & in-app notification when AI creation is saved
+ */
+const notifyDesignCreation = (
+  userId: string,
+  title: string,
+  mediaType: string,
+  designId?: string
+) => {
+  NotificationService.sendNotification({
+    userId,
+    title: "✨ New Design Created!",
+    body: `Your ${mediaType.toLowerCase()} "${title}" has been saved to My Designs.`,
+    type: "DESIGN_CREATED",
+    metadata: {
+      designId,
+      mediaType,
+      type: "AI_GENERATED",
+    },
+  }).catch((err) =>
+    console.error("⚠️ [AI Design Notification Error]:", err?.message || err)
+  );
+};
+
+
+/**
  * 1. Check AI Service Health and Provider Readiness
  */
 const getHealthStatus = async () => {
@@ -162,6 +188,9 @@ const generateImage = async (
     );
 
     result.savedDesigns = savedDesigns;
+    if (savedDesigns.length > 0) {
+      notifyDesignCreation(userId, savedDesigns[0].title, "IMAGE", savedDesigns[0].id);
+    }
   }
 
   return result;
@@ -204,6 +233,7 @@ const textToVideo = async (
     });
 
     result.savedDesign = savedDesign;
+    notifyDesignCreation(userId, savedDesign.title, "VIDEO", savedDesign.id);
   }
 
   return result;
@@ -253,6 +283,7 @@ const imageToVideo = async (
     });
 
     result.savedDesign = savedDesign;
+    notifyDesignCreation(userId, savedDesign.title, "VIDEO", savedDesign.id);
   }
 
   return result;
@@ -296,6 +327,7 @@ const textToMusic = async (
     });
 
     result.savedDesign = savedDesign;
+    notifyDesignCreation(userId, savedDesign.title, "MUSIC", savedDesign.id);
   }
 
   return result;
@@ -342,6 +374,7 @@ const enhanceAudio = async (
     });
 
     result.savedDesign = savedDesign;
+    notifyDesignCreation(userId, savedDesign.title, "AUDIO", savedDesign.id);
   }
 
   return result;
@@ -366,6 +399,8 @@ const saveCreation = async (userId: string, payload: ISaveCreationPayload) => {
       duration: payload.duration || null,
     },
   });
+
+  notifyDesignCreation(userId, newDesign.title, newDesign.mediaType, newDesign.id);
 
   return newDesign;
 };

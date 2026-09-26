@@ -19,6 +19,14 @@ router.patch(
   UserController.updateMe
 );
 
+// Save or Update User's FCM Device Push Notification Token
+router.post(
+  "/fcm-token",
+  auth("user", "admin"),
+  validateRequest(UserValidation.updateFcmTokenValidationSchema),
+  UserController.updateFcmToken
+);
+
 router.get("/", auth("admin"), UserController.getAllUsers);
 
 router.get("/:id", auth("admin"), UserController.getUserById);

@@ -71,10 +71,24 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const updateFcmToken = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user!;
+  const { fcmToken } = req.body;
+  const result = await UserService.updateFcmToken(user.id, fcmToken);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: result,
+  });
+});
+
 export const UserController = {
   getMe,
   updateMe,
   getAllUsers,
   getUserById,
   updateUserStatus,
+  updateFcmToken,
 };
