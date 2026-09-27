@@ -77,7 +77,7 @@ export interface ITextToMusicPayload {
   prompt?: string;
   lyrics?: string;
   song_name?: string;
-  style?: string;
+  style?: string | string[] | null;
   instrumental?: boolean;
   saveToDesigns?: boolean;
 }
@@ -94,7 +94,7 @@ export interface IGenerateMusicResponse {
   source_type?: string;
   mode: TMusicMode;
   song_name?: string;
-  style?: string | null;
+  style?: string | string[] | null;
   instrumental?: boolean;
   refined_by_openai?: boolean;
   estimated_duration_seconds?: number;
