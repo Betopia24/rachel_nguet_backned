@@ -85,7 +85,13 @@ const textToMusicValidationSchema = z.object({
       song_name: z.string().trim().optional().nullable(),
       prompt: z.string().trim().optional().nullable(),
       lyrics: z.string().trim().optional().nullable(),
-      style: z.string().trim().optional().nullable(),
+      style: z
+        .union([
+          z.array(z.string().trim()),
+          z.string().trim(),
+        ])
+        .optional()
+        .nullable(),
       instrumental: z.boolean().default(false).optional(),
       saveToDesigns: z.boolean().default(false).optional(),
     })
