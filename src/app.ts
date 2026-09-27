@@ -15,6 +15,8 @@ app.use(cookieParser());
 
 const allowedOrigins = [
   "http://localhost:3000",
+
+  
 ];
 
 app.use(

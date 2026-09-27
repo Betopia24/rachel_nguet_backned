@@ -89,30 +89,6 @@ const textToMusicValidationSchema = z.object({
       instrumental: z.boolean().default(false).optional(),
       saveToDesigns: z.boolean().default(false).optional(),
     })
-    .refine(
-      (data) => {
-        if (data.mode === "prompt") {
-          return !!data.prompt && data.prompt.trim().length >= 3;
-        }
-        return true;
-      },
-      {
-        message: "When mode is 'prompt', a prompt of at least 3 characters is required.",
-        path: ["prompt"],
-      }
-    )
-    .refine(
-      (data) => {
-        if (data.mode === "lyrics") {
-          return !!data.lyrics && data.lyrics.trim().length >= 5;
-        }
-        return true;
-      },
-      {
-        message: "When mode is 'lyrics', lyrics of at least 5 characters are required.",
-        path: ["lyrics"],
-      }
-    ),
 });
 
 const enhanceAudioValidationSchema = z.object({
