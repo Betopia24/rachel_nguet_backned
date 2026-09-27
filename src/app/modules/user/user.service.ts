@@ -1,6 +1,8 @@
+import bcrypt from "bcrypt";
 import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
-import { uploadToS3 } from "../../utils/s3";
+import { deleteFromCloudinary } from "../../utils/cloudinary";
+import { deleteFromS3, uploadToS3 } from "../../utils/s3";
 import { IUpdateProfile, IUpdateUserStatus } from "./user.interface";
 
 const userSelect = {
@@ -122,6 +124,93 @@ const updateFcmToken = async (userId: string, fcmToken: string) => {
   };
 };
 
+/**
+ * Internal helper to completely remove a user and all related data (designs, notifications, subscriptions, S3/Cloudinary media)
+ */
+const deleteUserInternal = async (userId: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  // 1. Fetch user designs to clean up media from Cloudinary / S3
+  const designs = await prisma.design.findMany({
+    where: { userId },
+    select: { id: true, publicId: true, imageUrl: true },
+  });
+
+  for (const design of designs) {
+    if (design.publicId) {
+      try {
+        if (
+          design.imageUrl?.includes("amazonaws.com") ||
+          design.publicId.startsWith("designs/")
+        ) {
+          await deleteFromS3(design.publicId);
+        } else {
+          await deleteFromCloudinary(design.publicId);
+        }
+      } catch (err) {
+        console.error(`Failed to delete media for design ${design.id}:`, err);
+      }
+    }
+  }
+
+  // 2. Clean up user's avatar from S3 if present
+  if (
+    user.avatar &&
+    user.avatar.includes("amazonaws.com") &&
+    user.avatar.includes("avatars/")
+  ) {
+    try {
+      const key = user.avatar.split(".amazonaws.com/")[1];
+      if (key) {
+        await deleteFromS3(key);
+      }
+    } catch (err) {
+      console.error("Failed to delete user avatar from S3:", err);
+    }
+  }
+
+  // 3. Remove all associated data in database
+  await prisma.$transaction([
+    prisma.design.deleteMany({ where: { userId } }),
+    prisma.notification.deleteMany({ where: { userId } }),
+    prisma.subscription.deleteMany({ where: { userId } }),
+    prisma.otp.deleteMany({ where: { email: user.email } }),
+    prisma.user.delete({ where: { id: userId } }),
+  ]);
+
+  return { message: "Account deleted successfully." };
+};
+
+const deleteMyAccount = async (userId: string, password?: string) => {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+  });
+
+  if (!user) {
+    throw new AppError("User not found", 404);
+  }
+
+  // If password was provided and user has a password set (email authentication)
+  if (password && user.password) {
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      throw new AppError("Incorrect password. Please verify and try again.", 400);
+    }
+  }
+
+  return await deleteUserInternal(userId);
+};
+
+const deleteUserByAdmin = async (userId: string) => {
+  return await deleteUserInternal(userId);
+};
+
 export const UserService = {
   getMe,
   updateMe,
@@ -129,5 +218,7 @@ export const UserService = {
   getUserById,
   updateUserStatus,
   updateFcmToken,
+  deleteMyAccount,
+  deleteUserByAdmin,
 };
 

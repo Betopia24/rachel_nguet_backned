@@ -84,6 +84,31 @@ const updateFcmToken = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const deleteMyAccount = catchAsync(async (req: Request, res: Response) => {
+  const user = req.user!;
+  const { password } = req.body || {};
+  const result = await UserService.deleteMyAccount(user.id, password);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: null,
+  });
+});
+
+const deleteUserByAdmin = catchAsync(async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const result = await UserService.deleteUserByAdmin(id);
+
+  sendResponse(res, {
+    statusCode: 200,
+    success: true,
+    message: result.message,
+    data: null,
+  });
+});
+
 export const UserController = {
   getMe,
   updateMe,
@@ -91,4 +116,6 @@ export const UserController = {
   getUserById,
   updateUserStatus,
   updateFcmToken,
+  deleteMyAccount,
+  deleteUserByAdmin,
 };

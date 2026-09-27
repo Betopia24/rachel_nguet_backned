@@ -3,6 +3,7 @@ import { auth } from "../../middleware/auth";
 import { validateRequest } from "../../middleware/validateRequest";
 import { AuthController } from "./auth.controller";
 import { AuthValidation } from "./auth.validation";
+import { UserController } from "../user/user.controller";
 
 const router = Router();
 
@@ -75,6 +76,13 @@ router.post(
   "/refresh-token",
   validateRequest(AuthValidation.refreshTokenValidationSchema),
   AuthController.refreshToken
+);
+
+// Delete Account
+router.delete(
+  "/delete-account",
+  auth("user", "admin"),
+  UserController.deleteMyAccount
 );
 
 export const authRoutes = router;
