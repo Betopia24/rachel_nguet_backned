@@ -45,7 +45,7 @@ app.use(
 app.use("/api/v1", router);
 
 app.get("/", (req, res) => {
-  res.send("my-server is running............");
+  res.send("Diamond Pay API is running............");
 });
 
 app.use(globalErrorHandler);
