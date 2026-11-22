@@ -97,7 +97,7 @@ export const verifyFirebaseIdToken = async (idToken: string): Promise<DecodedIdT
     const decodedToken = await auth.verifyIdToken(idToken.trim());
     return decodedToken;
   } catch (error: any) {
-    console.error("❌ [Firebase Token Verification Failed]:", error.code || error.message);
+    console.error("❌ [Firebase Token Verification Failed]:", error.code, "-", error.message);
 
     if (error.code === "auth/id-token-expired") {
       throw new AppError("Firebase session expired. Please sign in again on your device.", 401);
