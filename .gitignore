@@ -27,3 +27,6 @@ temp_interactive_push.bat
 .env
 
 .env
+
+logs/
+uploads/

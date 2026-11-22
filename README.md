@@ -58,7 +58,7 @@ Directly integrates with the high-performance AI microservice:
 - **Cloud Storage**: AWS S3 (`@aws-sdk/client-s3`)
 - **Social Login**: Firebase Admin SDK
 - **Email Delivery**: Nodemailer (SMTP)
-- **Containerization**: Docker & Docker Compose
+- **Process Manager**: PM2
 
 ---
 
@@ -127,20 +127,33 @@ npm start
 
 ---
 
-## 🐳 Docker Deployment
+## 🚀 VPS Deployment (PM2)
 
-The application includes a production-ready `Dockerfile` and `docker-compose.yml`:
+Requirements on the VPS: Node.js 20+ and PM2 (`npm install -g pm2`).
 
 ```bash
-# Build and run containers in background
-docker compose up -d --build
+# 1. Upload the project and create .env (copy from .env.example)
+cd /path/to/rachel_nguet_backned
+cp .env.example .env   # then fill in the values
 
-# View real-time logs
-docker compose logs -f
+# 2. Install dependencies, build and start with PM2
+npm install
+npm run pm2:start
 
-# Stop containers
-docker compose down
+# 3. Keep the app running after a VPS reboot
+pm2 save
+pm2 startup            # run the command it prints
+
+# Deploying updates
+git pull && npm install && npm run pm2:restart
+
+# Logs / status / stop
+npm run pm2:logs
+pm2 status
+npm run pm2:stop
 ```
+
+Logs are also written to `logs/out.log` and `logs/error.log`.
 
 ---
 
