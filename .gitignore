@@ -11,9 +11,18 @@ Diamond_Pay_API.postman_collection.json
 postman_collection.json
 
 firebase-service-account.json
+
 *service-account*.json
 config.bat
+
 branch_structure.json
+
+
 temp_auto_push.bat
+
 temp_interactive_push.bat
+
 .gitignore
+
+.env
+
