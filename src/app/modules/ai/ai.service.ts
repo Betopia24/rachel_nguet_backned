@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import config from "../../../config";
 import { AppError } from "../../error/AppError";
 import { prisma } from "../../lib/prisma";
@@ -13,6 +14,17 @@ import {
   ITextToVideoPayload,
 } from "./ai.interface";
 import { NotificationService } from "../notification/notification.service";
+import { serializeDesign } from "../design/design.serializer";
+
+/** Stable error code the app can switch on, derived from the upstream HTTP status. */
+const aiErrorCodeForStatus = (status: number): string => {
+  if (status === 429) return "AI_QUOTA_EXCEEDED";
+  if (status === 504) return "AI_TIMEOUT";
+  if (status === 503) return "AI_UNAVAILABLE";
+  if (status >= 500) return "AI_PROVIDER_ERROR";
+  if (status === 400) return "AI_BAD_REQUEST";
+  return "AI_REQUEST_FAILED";
+};
 
 /**
  * Universal helper for making HTTP requests to FastAPI AI Microservice
@@ -61,26 +73,41 @@ const callAIService = async <T>(
       console.error(`❌ [AI Microservice Error] [${response.status}] ${targetUrl}:`, rawData);
 
       let errorMessage = "AI microservice failed to process request.";
+      let providerCode: string | undefined;
+      let details: unknown;
 
       if (isJson && rawData) {
-        if (Array.isArray(rawData.detail)) {
+        const detail = rawData.detail;
+        if (Array.isArray(detail)) {
           // FastAPI validation errors
-          errorMessage = rawData.detail
-            .map((item: any) => item.msg || JSON.stringify(item))
-            .join("; ");
-        } else if (typeof rawData.detail === "string") {
-          errorMessage = rawData.detail;
+          errorMessage = detail.map((item: any) => item.msg || JSON.stringify(item)).join("; ");
+        } else if (typeof detail === "string") {
+          errorMessage = detail;
+        } else if (detail && typeof detail === "object") {
+          // Structured error from the AI service: { code, message, failures }
+          errorMessage = detail.message || JSON.stringify(detail);
+          providerCode = typeof detail.code === "string" ? detail.code : undefined;
+          details = detail.failures;
         } else if (rawData.message) {
           errorMessage = rawData.message;
         } else {
           errorMessage = JSON.stringify(rawData);
         }
+      } else if ([502, 503, 504].includes(response.status)) {
+        // HTML error page from a gateway/proxy (nginx etc.) — don't leak it to the app
+        errorMessage =
+          "The AI service is temporarily unavailable or took too long to respond. Please try again.";
       } else if (typeof rawData === "string" && rawData.length > 0) {
-        errorMessage = rawData;
+        errorMessage = rawData.slice(0, 300);
       }
 
       const statusCode = response.status === 422 ? 400 : response.status;
-      throw new AppError(`AI Service Error: ${errorMessage}`, statusCode);
+      throw new AppError(
+        `AI Service Error: ${errorMessage}`,
+        statusCode,
+        providerCode ? `AI_${providerCode}` : aiErrorCodeForStatus(statusCode),
+        details
+      );
     }
 
     return rawData as T;
@@ -94,18 +121,24 @@ const callAIService = async <T>(
     if (error.name === "AbortError") {
       throw new AppError(
         `AI request timed out after ${Math.round(timeoutMs / 1000)} seconds. High-load operations like video or music rendering may take longer. Please try again.`,
-        504
+        504,
+        "AI_TIMEOUT"
       );
     }
 
     if (error.code === "ECONNREFUSED" || error.cause?.code === "ECONNREFUSED") {
       throw new AppError(
-        `Unable to connect to AI engine at ${baseUrl}. Please check that the AI service is online.`,
-        503
+        "The AI service is currently offline. Please try again in a few minutes.",
+        503,
+        "AI_UNAVAILABLE"
       );
     }
 
-    throw new AppError(`AI service communication failure: ${error.message || "Unknown error"}`, 500);
+    throw new AppError(
+      `AI service communication failure: ${error.message || "Unknown error"}`,
+      502,
+      "AI_COMMUNICATION_FAILED"
+    );
   }
 };
 
@@ -153,6 +186,11 @@ const generateImage = async (
 ): Promise<IGenerateImageResponse> => {
   const { prompt, aspect_ratio = "1:1", number_of_images = 1, saveToDesigns, title } = payload;
 
+  // One id for the whole request: every saved design of this batch shares it.
+  const generationId = randomUUID();
+
+  // The AI service generates the images in parallel and returns whatever succeeded.
+  // It only responds with an error when *every* image failed.
   const result = await callAIService<IGenerateImageResponse>("/api/v1/images/generate", {
     method: "POST",
     body: {
@@ -162,35 +200,55 @@ const generateImage = async (
     },
   });
 
+  const images = result.images ?? [];
+  const failed = result.failed ?? [];
+
+  result.generationId = generationId;
+  result.requested = number_of_images;
+  result.failed = failed;
+  result.partial = images.length > 0 && failed.length > 0;
+
+  if (result.partial) {
+    console.warn(
+      `⚠️ [AI Image]: partial success ${images.length}/${number_of_images} for user ${userId}:`,
+      failed.map((f) => `#${f.index} ${f.code}`).join(", ")
+    );
+  }
+
   // Optional: Auto-save generated image(s) to user's designs
-  if (saveToDesigns && result.images && result.images.length > 0) {
+  if (saveToDesigns && images.length > 0) {
     const savedDesigns = await Promise.all(
-      result.images.map(async (img, idx) => {
+      images.map(async (img, idx) => {
+        // Position in the original request, so "#3" stays "#3" even if "#2" failed.
+        const position = img.index ?? idx + 1;
         const itemTitle =
-          title && result.images.length === 1
+          title && number_of_images === 1
             ? title
             : title
-            ? `${title} #${idx + 1}`
-            : `AI Diamond Image ${idx + 1}`;
+            ? `${title} #${position}`
+            : `AI Diamond Image ${position}`;
 
-        return await prisma.design.create({
+        const design = await prisma.design.create({
           data: {
             userId,
             title: itemTitle,
             imageUrl: img.url,
             mediaType: "IMAGE",
             publicId: img.key,
+            thumbnailUrl: img.thumbnail_url || null,
+            thumbnailKey: img.thumbnail_key || null,
+            generationId,
+            generationIndex: position,
             type: "AI_GENERATED",
             prompt: result.final_prompt || prompt,
           },
         });
+        return serializeDesign(design);
       })
     );
 
     result.savedDesigns = savedDesigns;
-    if (savedDesigns.length > 0) {
-      notifyDesignCreation(userId, savedDesigns[0].title, "IMAGE", savedDesigns[0].id);
-    }
+    notifyDesignCreation(userId, savedDesigns[0].title, "IMAGE", savedDesigns[0].id);
   }
 
   return result;
@@ -397,12 +455,16 @@ const saveCreation = async (userId: string, payload: ISaveCreationPayload) => {
       type: "AI_GENERATED",
       prompt: payload.prompt || null,
       duration: payload.duration || null,
+      thumbnailUrl: payload.thumbnailUrl || null,
+      thumbnailKey: payload.thumbnailKey || null,
+      generationId: payload.generationId || null,
+      generationIndex: payload.generationIndex || null,
     },
   });
 
   notifyDesignCreation(userId, newDesign.title, newDesign.mediaType, newDesign.id);
 
-  return newDesign;
+  return serializeDesign(newDesign);
 };
 
 export const AIService = {

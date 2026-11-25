@@ -81,11 +81,19 @@ model Design {
   type         DesignType  @default(UPLOADED)
   prompt       String?
   duration     Int?
+  // Small WebP preview (~720px) for lists/grids. imageUrl always stays full-resolution.
+  thumbnailUrl String?
+  thumbnailKey String?
+  // Same UUID on every image produced by one generation request (batch of 2-4).
+  generationId    String?
+  // 1-based position inside the batch, so the app never has to guess the order.
+  generationIndex Int?
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
   @@index([userId, createdAt])
   @@index([userId, mediaType])
+  @@index([userId, generationId])
 }
 
 enum DesignType {

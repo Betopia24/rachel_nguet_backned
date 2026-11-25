@@ -134,6 +134,10 @@ const saveCreationValidationSchema = z.object({
     mimeType: z.string().optional(),
     prompt: z.string().optional(),
     duration: z.number().int().positive().optional(),
+    thumbnailUrl: z.string().url("thumbnailUrl must be a valid URL.").optional(),
+    thumbnailKey: z.string().optional(),
+    generationId: z.string().trim().min(1).max(64).optional(),
+    generationIndex: z.number().int().positive().optional(),
   }),
 });
 

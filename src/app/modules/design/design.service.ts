@@ -4,6 +4,7 @@ import { deleteFromCloudinary } from "../../utils/cloudinary";
 import { deleteFromS3, uploadToS3 } from "../../utils/s3";
 import { IDesignFilterOptions, IUploadDesignPayload } from "./design.interface";
 import { NotificationService } from "../notification/notification.service";
+import { serializeDesign } from "./design.serializer";
 
 /**
  * 1. Upload Diamond Design to AWS S3 & Save to Database
@@ -57,7 +58,7 @@ const uploadDesign = async (
     console.error("⚠️ [Design Upload Notification Error]:", err?.message || err)
   );
 
-  return newDesign;
+  return serializeDesign(newDesign);
 };
 
 /**
@@ -148,7 +149,7 @@ const getMyDesigns = async (
         music: musicCount,
       },
     },
-    data: designs,
+    data: designs.map(serializeDesign),
   };
 };
 
@@ -167,7 +168,7 @@ const getRecentDesigns = async (userId: string, limit = 5, mediaType?: any) => {
     take: Number(limit),
   });
 
-  return recentDesigns;
+  return recentDesigns.map(serializeDesign);
 };
 
 /**
@@ -186,7 +187,7 @@ const getDesignById = async (userId: string, designId: string) => {
     throw new AppError("You do not have permission to view this design.", 403);
   }
 
-  return design;
+  return serializeDesign(design);
 };
 
 /**
@@ -212,6 +213,10 @@ const deleteDesign = async (userId: string, userRole: string, designId: string) 
     } else {
       await deleteFromCloudinary(design.publicId);
     }
+  }
+
+  if (design.thumbnailKey) {
+    await deleteFromS3(design.thumbnailKey);
   }
 
   // Delete from database
@@ -249,7 +254,7 @@ const updateDesign = async (
     },
   });
 
-  return updated;
+  return serializeDesign(updated);
 };
 
 export const DesignService = {

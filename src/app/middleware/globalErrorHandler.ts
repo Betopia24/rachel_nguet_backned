@@ -103,6 +103,7 @@ export const globalErrorHandler = (
   res.status(statusCode).json({
     success: false,
     message,
-    errorDetails: errorDetails.length > 0 ? errorDetails : undefined,
+    errorCode: err.errorCode || undefined,
+    errorDetails: errorDetails.length > 0 ? errorDetails : err.details || undefined,
   });
 };

@@ -27,7 +27,9 @@ const generateImage = catchAsync(async (req: Request, res: Response) => {
   sendResponse(res, {
     statusCode: 201,
     success: true,
-    message: "Diamond image generated successfully",
+    message: result.partial
+      ? `${result.images.length} of ${result.requested} images generated. Some images failed - see "failed" for details.`
+      : "Diamond image generated successfully",
     data: result,
   });
 });

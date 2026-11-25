@@ -14,18 +14,37 @@ export interface IGenerateImagePayload {
 }
 
 export interface IGeneratedImageItem {
+  /** 1-based position within the request (stays stable even if others failed). */
+  index?: number;
   bucket: string;
   key: string;
   s3_uri: string;
+  /** Full-resolution image. */
   url: string;
+  /** ~720px WebP preview; null if thumbnail creation failed. */
+  thumbnail_url?: string | null;
+  thumbnail_key?: string | null;
+}
+
+export interface IFailedImageItem {
+  index: number;
+  status_code: number;
+  code: string;
+  message: string;
 }
 
 export interface IGenerateImageResponse {
+  /** "completed" = all images ok, "partial" = some failed. */
   status: string;
   prompt: string;
   final_prompt?: string;
   model?: string;
+  requested?: number;
   images: IGeneratedImageItem[];
+  failed?: IFailedImageItem[];
+  /** Shared by every image of this request (and by every saved design). */
+  generationId?: string;
+  partial?: boolean;
   savedDesigns?: any[];
 }
 
@@ -133,4 +152,8 @@ export interface ISaveCreationPayload {
   mimeType?: string;
   prompt?: string;
   duration?: number;
+  thumbnailUrl?: string;
+  thumbnailKey?: string;
+  generationId?: string;
+  generationIndex?: number;
 }
